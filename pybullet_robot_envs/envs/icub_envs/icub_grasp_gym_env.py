@@ -54,7 +54,7 @@ class iCubGraspGymEnv(gym.Env):
         self._rnd_obj_pose = rnd_obj_pose
 
         self._base_controller = []
-        self._superq = []
+        self._superqs = []
         self._grasp_pose = []
 
         # Initialize PyBullet simulator
@@ -120,25 +120,19 @@ class iCubGraspGymEnv(gym.Env):
 
         self._base_controller.set_object_info(self._world.get_object_shape_info())
         if self._base_controller.compute_object_pointcloud(self._world.get_observation()):
-            self._superq = self._base_controller.estimate_superq()
+            self._superqs = self._base_controller.estimate_superq()
         else:
             print("Can't get good point cloud of the object")
 
         self._grasp_pose = self._base_controller.estimate_grasp()
 
         print("object pose: {}".format(self._world.get_observation()))
-        print("superq pose: {} {}".format(self._superq[0].center, self._superq[0].ea))
+        print("superq pose: {} {}".format(self._superqs[0].center, self._superqs[0].ea))
         print("grasp pose: {}".format(self._grasp_pose))
 
-        pose = self._superq[0].center
-        p.addUserDebugLine([pose[0][0], pose[1][0], pose[2][0]], [pose[0][0]+0.1, pose[1][0], pose[2][0]], [1, 0, 0], parentObjectUniqueId=self._robot.icubId, parentLinkIndex=-1)
-        p.addUserDebugLine([pose[0][0], pose[1][0], pose[2][0]], [pose[0][0], pose[1][0]+0.1, pose[2][0]], [0, 1, 0], parentObjectUniqueId=self._robot.icubId, parentLinkIndex=-1)
-        p.addUserDebugLine([pose[0][0], pose[1][0], pose[2][0]], [pose[0][0], pose[1][0], pose[2][0]+0.1], [0, 0, 1], parentObjectUniqueId=self._robot.icubId, parentLinkIndex=-1)
+        self.debug_gui()
 
-        pose = self._grasp_pose[:3]
-        p.addUserDebugLine(pose, [pose[0]+0.2,pose[1],pose[2]], [1, 0, 0], parentObjectUniqueId=self._robot.icubId, parentLinkIndex=-1)
-        p.addUserDebugLine(pose, [pose[0],pose[1]+0.2,pose[2]], [0, 1, 0], parentObjectUniqueId=self._robot.icubId, parentLinkIndex=-1)
-        p.addUserDebugLine(pose, [pose[0],pose[1],pose[2]+0.2], [0, 0, 1], parentObjectUniqueId=self._robot.icubId, parentLinkIndex=-1)
+        self._base_controller._visualizer.render()
 
         return np.array(self._observation)
 
@@ -176,10 +170,10 @@ class iCubGraspGymEnv(gym.Env):
     def step2(self, action):
 
         # tracker --> check how to put it in separate thread
-        if self._base_controller.check_object_moved(self._world.get_observation()):
-            ok = self._base_controller.compute_object_pointcloud(self._world.get_observation())
-            if ok:
-                self._superq = self._base_controller.estimate_superq()
+        #if self._base_controller.check_object_moved(self._world.get_observation()):
+         #   ok = self._base_controller.compute_object_pointcloud(self._world.get_observation())
+         #   if ok:
+          #      self._superq = self._base_controller.estimate_superq()
 
         # get action from base controller
         base_action = self._base_controller.get_next_action(self._robot.hand_pose)
@@ -273,3 +267,23 @@ class iCubGraspGymEnv(gym.Env):
             reward = np.float32(100.0)
 
         return reward
+
+    def debug_gui(self):
+
+        pose = self._superqs[0].center
+        p.addUserDebugLine([pose[0][0], pose[1][0], pose[2][0]], [pose[0][0]+0.1, pose[1][0], pose[2][0]], [1, 0, 0])
+        p.addUserDebugLine([pose[0][0], pose[1][0], pose[2][0]], [pose[0][0], pose[1][0]+0.1, pose[2][0]], [0, 1, 0])
+        p.addUserDebugLine([pose[0][0], pose[1][0], pose[2][0]], [pose[0][0], pose[1][0], pose[2][0]+0.1], [0, 0, 1])
+
+        pose = self._grasp_pose[:3]
+
+        matrix = p.getMatrixFromQuaternion(p.getQuaternionFromEuler(self._grasp_pose[3:6]))
+        dcm = np.array([matrix[0:3], matrix[3:6], matrix[6:9]])
+        np_pose = np.array(list(pose))
+        pax = np_pose + np.array(list(dcm.dot([0.1, 0, 0])))
+        pay = np_pose + np.array(list(dcm.dot([0, 0.1, 0])))
+        paz = np_pose + np.array(list(dcm.dot([0, 0, 0.1])))
+
+        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0])
+        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0])
+        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1])

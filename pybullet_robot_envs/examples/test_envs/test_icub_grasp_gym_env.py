@@ -5,7 +5,7 @@ parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
 
 a = os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib/superquadriclib/bindings')
-# a = os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib')
+#a = os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib')
 
 print(os.sys.path)
 
@@ -25,7 +25,7 @@ import numpy as np
 
 def main(args):
 
-    env = iCubGraspGymEnv(urdfRoot=robot_data.getDataPath(), renders=True, control_arm='r', useOrientation=1, rnd_obj_pose=0)
+    env = iCubGraspGymEnv(urdfRoot=robot_data.getDataPath(), renders=True, control_arm='l', useOrientation=1, rnd_obj_pose=0)
 
     motorsIds = []
 

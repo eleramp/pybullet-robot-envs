@@ -5,7 +5,7 @@ os.sys.path.insert(0,currentdir)
 import numpy as np
 import pybullet as p
 import pybullet_data
-# import robot_data
+import robot_data
 import pymesh
 import superquadric_bindings
 from superquadric_bindings import PointCloud, SuperqEstimatorApp
@@ -44,9 +44,12 @@ class WorldFetchEnv:
         self._h_table = table_info[5][2] + table_info[3][2]/2
 
         # Load object. Randomize its start position if requested
+        #obj_pose = self._sample_pose()
+        #self._obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "duck_vhacd.urdf"), obj_pose)
+
         obj_pose = self._sample_pose()
-        self._obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "duck_vhacd.urdf"), obj_pose)
-        # self._obj_id = p.loadURDF(os.path.join(robot_data.getDataPath(), "objects/bottle/bottle.urdf"),obj_pose)
+        self._obj_id = p.loadURDF(os.path.join(robot_data.getDataPath(), "objects/006_mustard_bottle/mustard_bottle.urdf"),
+                                  basePosition=obj_pose)
 
     def get_table_height(self):
         return self._h_table
@@ -70,8 +73,8 @@ class WorldFetchEnv:
 
     def _sample_pose(self):
         if self._rnd_obj_pose:
-            px = self.np_random.uniform(low=self._ws_lim[0][0], high=self._ws_lim[0][1], size=(1))
-            py = self.np_random.uniform(low=self._ws_lim[1][0]+0.005*self.np_random.rand(), high=self._ws_lim[1][1]-0.005*self.np_random.rand(), size=(1))
+            px = np.random.uniform(low=self._ws_lim[0][0], high=self._ws_lim[0][1], size=(1))
+            py = np.random.uniform(low=self._ws_lim[1][0]+0.005*np.random.rand(), high=self._ws_lim[1][1]-0.005*np.random.rand(), size=(1))
         else:
             px = self._ws_lim[0][0] + 0.5*(self._ws_lim[0][1]-self._ws_lim[0][0])
             py = self._ws_lim[1][0] + 0.5*(self._ws_lim[1][1]-self._ws_lim[1][0])
@@ -79,6 +82,9 @@ class WorldFetchEnv:
         obj_pose = [px, py, pz]
 
         return obj_pose
+
+    def seed(self, seed=None):
+        np.random.seed(seed)
 
     def debug_gui(self):
         p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self._obj_id)

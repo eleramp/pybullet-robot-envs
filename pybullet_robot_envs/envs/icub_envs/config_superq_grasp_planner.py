@@ -2,11 +2,11 @@
 import math
 
 mode = {
-    'control_arms': 'right',
+    'control_arms': 'left',
 }
 
 sq_model = {
-    'object_class': 'box',
+    'object_class': 'cylinder', #cylinder, box, sphere, default
     'tol': 1e-5,
     'optimizer_points': 50,
     'random_sampling': True,
@@ -21,7 +21,7 @@ sq_grasp = {
     'tol': 1e-5,
     'constr_tol': 1e-4,
     'max_superq': 4,
-    'plane_table': [0.0, 0.0, 1.0, 0.65],  # check this
+    'plane_table': [0.0, 0.0, 1.0, 0.1],  # check this
     'displacement': [0.0, 0.0, 0.0],  # check this
     'hand_sq': [0.03, 0.06, 0.03, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     # how to set the following bounds?
