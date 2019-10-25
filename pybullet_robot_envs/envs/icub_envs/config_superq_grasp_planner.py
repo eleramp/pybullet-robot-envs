@@ -2,7 +2,7 @@
 import math
 
 mode = {
-    'control_arms': 'left',
+    'control_arms': 'right',
 }
 
 sq_model = {
@@ -21,8 +21,8 @@ sq_grasp = {
     'tol': 1e-5,
     'constr_tol': 1e-4,
     'max_superq': 4,
-    'plane_table': [0.0, 0.0, 1.0, 0.1],  # check this
-    'displacement': [0.0, 0.0, 0.0],  # check this
+    'plane_table': [0.0, 0.0, 1.0, 0.15],  # check this
+    'displacement': [0.00, 0.00, 0.005],  # check this
     'hand_sq': [0.03, 0.06, 0.03, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     # how to set the following bounds?
     'bounds_right': [-0.5, 0.0, -0.2, 0.2, -0.3, 0.3, -math.pi, math.pi, -math.pi, math.pi, -math.pi, math.pi],
