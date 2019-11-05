@@ -188,21 +188,7 @@ class SuperqGraspPlanner:
             self._visualizer.resetSuperq()
             self._visualizer.addSuperq(sq)
 
-        # trasform superquadric pose from icub world to pybullet world
-        sq_out = superquadric_bindings.vector_superquadric(np.size(self._superqs, 0))
-        for i, s in enumerate(self._superqs):
-            sq_out[i] = s
-
-            # axis angle to quaterion
-            quat_sq = axis_angle_to_quaternion((s.axisangle[0][0], s.axisangle[1][0], s.axisangle[2][0], s.axisangle[3][0]))
-
-            w_py_T_sq = p.multiplyTransforms(self._robot_base_pose[0], self._robot_base_pose[1], (s.center[0][0], s.center[1][0], s.center[2][0]), quat_sq)
-            vec_aa_sq = quaternion_to_axis_angle(w_py_T_sq[1])
-
-            sq_out[i].setSuperqOrientation(np.array(vec_aa_sq))
-            sq_out[i].setSuperqCenter(np.array(w_py_T_sq[0]))
-
-        return sq_out
+        return np.size(self._superqs, 0) >= 0
 
     def estimate_grasp(self):
 
@@ -216,6 +202,9 @@ class SuperqGraspPlanner:
            sq[i] = s
 
         grasp_res_hand = self._grasp_estimator.computeGraspPoses(sq)
+
+        if np.size(grasp_res_hand.grasp_poses,0) is 0:
+            return False
 
         # visualize them
         if self._render:
@@ -260,7 +249,29 @@ class SuperqGraspPlanner:
         gp_out = [w_py_T_gp_py[0][0], w_py_T_gp_py[0][1], w_py_T_gp_py[0][2], gp_py_orn[0], gp_py_orn[1], gp_py_orn[2]]
         self._best_grasp_pose = gp_out
 
-        return gp_out
+        return True
+
+    def get_superqs(self):
+        # trasform superquadric pose from icub world to pybullet world
+        sq_out = superquadric_bindings.vector_superquadric(np.size(self._superqs, 0))
+        for i, s in enumerate(self._superqs):
+            sq_out[i] = s
+
+            # axis angle to quaterion
+            quat_sq = axis_angle_to_quaternion(
+                (s.axisangle[0][0], s.axisangle[1][0], s.axisangle[2][0], s.axisangle[3][0]))
+
+            w_py_T_sq = p.multiplyTransforms(self._robot_base_pose[0], self._robot_base_pose[1],
+                                             (s.center[0][0], s.center[1][0], s.center[2][0]), quat_sq)
+            vec_aa_sq = quaternion_to_axis_angle(w_py_T_sq[1])
+
+            sq_out[i].setSuperqOrientation(np.array(vec_aa_sq))
+            sq_out[i].setSuperqCenter(np.array(w_py_T_sq[0]))
+
+        return sq_out
+
+    def get_grasp_pose(self):
+        return self._best_grasp_pose.copy()
 
     def compute_approach_path(self):
         # reset current path
@@ -324,7 +335,7 @@ class SuperqGraspPlanner:
         """
         hand_pose = robot_obs[:6]
         obj_pose = world_obs[:6]
-        tg_h_obj = world_obs[-1]
+        tg_h_obj = 0.85
 
         # Check if done
         if obj_pose[2] >= (tg_h_obj - atol*2):

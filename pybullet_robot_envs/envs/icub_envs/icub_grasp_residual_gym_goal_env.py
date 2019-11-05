@@ -16,13 +16,11 @@ import robot_data
 import pybullet_robot_envs.envs.utils
 from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaternion, quaternion_to_axis_angle, sph_coord
 
-largeValObservation = 100
-
 RENDER_HEIGHT = 240
 RENDER_WIDTH = 320
 
 
-class iCubGraspResidualGymEnv(gym.Env):
+class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
     metadata = {'render.modes': ['human', 'rgb_array'],
     'video.frames_per_second': 50}
 
@@ -55,6 +53,8 @@ class iCubGraspResidualGymEnv(gym.Env):
         self. _noise_pcl = noise_pcl
         self._last_frame_time = 0
         self._terminal_failure = terminal_failure
+        self.distance_threshold = 0.02
+        self._obj0_T_sq =[]
 
         # Initialize PyBullet simulator
         self._p = p
@@ -83,16 +83,17 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         # initialize simulation environment
         self.seed()
-        self.reset()
+        obs = self.reset()
 
-        observationDim = len(self.get_extended_observation())
-        observation_high = np.array([largeValObservation] * observationDim)
-        self.observation_space = spaces.Box(-observation_high, observation_high, dtype='float32')
+        self.observation_space = spaces.Dict(dict(
+            desired_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            achieved_goal=spaces.Box(-np.inf, np.inf, shape=obs['achieved_goal'].shape, dtype='float32'),
+            observation=spaces.Box(-np.inf, np.inf, shape=obs['observation'].shape, dtype='float32'),
+        ))
 
         action_dim = self._robot.getActionDimension()
-        self._action_bound = 1
-        action_high = np.array([self._action_bound] * action_dim)
-        self.action_space = spaces.Box(-action_high, action_high, dtype='float32')
+        action_bound = 1.
+        self.action_space = spaces.Box(-action_bound, action_bound, shape=(action_dim,), dtype='float32')
 
         self.viewer = None
 
@@ -104,8 +105,6 @@ class iCubGraspResidualGymEnv(gym.Env):
         p.setPhysicsEngineParameter(numSolverIterations=150)
         p.setTimeStep(self._time_step)
         self._envStepCounter = 0
-
-        p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0])
 
         self._robot.reset()
         self._world.reset()
@@ -122,24 +121,35 @@ class iCubGraspResidualGymEnv(gym.Env):
         self._robot.debug_gui()
         self._world.debug_gui()
 
+
+
         self._base_controller.reset(robot_id=self._robot.icubId, obj_id=self._world.obj_id,
                                     starting_pose=np.array(self._robot.getObservation()))
 
-        self._base_controller.set_object_info(self._world.get_object_shape_info())
-
         self.compute_grasp_pose()
-
-        self.get_extended_observation()
-
         self.debug_gui()
+
         p.stepSimulation()
 
-        if self._renders:
-            self._base_controller._visualizer.render()
+        self.goal = self._compute_goal()
 
         self._t_grasp, self._t_lift = 0, 0
 
-        return np.array(self._observation)
+        return self.get_extended_observation()
+
+    def _compute_goal(self):
+        sq_pos = self._superqs[0].center.copy()
+        sq_eu = self._superqs[0].ea.copy()
+
+        gp = self._grasp_pose.copy()
+
+        # relative sq position wrt grasping pose
+        inv_gp_pose = p.invertTransform(gp[:3], p.getQuaternionFromEuler(gp[3:6]))
+        sq_pos_in_gp, sq_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
+                                                          sq_pos, p.getQuaternionFromEuler(sq_eu))
+        sq_eu_in_gp = p.getEulerFromQuaternion(sq_orn_in_gp)
+
+        return np.array(sq_pos_in_gp + sq_eu_in_gp)
 
     def compute_grasp_pose(self):
 
@@ -173,33 +183,34 @@ class iCubGraspResidualGymEnv(gym.Env):
         if self._renders:
             self._base_controller._visualizer.render()
 
-    def get_extended_observation(self):
-        self._observation = []
+        return self._grasp_pose
 
-        # get observation form robot and world
+    def get_extended_observation(self):
+        # get observation from robot and world
         robot_observation = self._robot.getObservation()
         world_observation = self._world.get_observation()
-
-        # relative object position wrt hand c.o.m. frame
-        inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], p.getQuaternionFromEuler(robot_observation[3:6]))
-        obj_pos_in_hand, obj_orn_in_hand = p.multiplyTransforms(inv_hand_pos, inv_hand_orn, world_observation[:3],
-                                                                p.getQuaternionFromEuler(world_observation[3:6]))
-        obj_euler_in_hand = p.getEulerFromQuaternion(obj_orn_in_hand)
 
         # get superquadric params of dimension and shape
         sq_dim = self._superqs[0].dim
         sq_exp = self._superqs[0].exp
+        sq_arr = np.array([sq_dim[0][0], sq_dim[1][0], sq_dim[2][0], sq_exp[0][0], sq_exp[1][0]])
 
-        self._observation.extend(list(robot_observation))
-        self._observation.extend(list(world_observation))
-        self._observation.extend(list(obj_pos_in_hand))
-        self._observation.extend(list(obj_euler_in_hand))
-        self._observation.extend([sq_dim[0][0], sq_dim[1][0], sq_dim[2][0], sq_exp[0][0], sq_exp[1][0]])
+        sq_pos = [self._superqs[0].center[0][0], self._superqs[0].center[1][0], self._superqs[0].center[2][0]]
+        sq_eu = [self._superqs[0].ea[0][0], self._superqs[0].ea[1][0], self._superqs[0].ea[2][0]]
 
-        target_h_obj = self._world.get_table_height() + 0.2
-        self._observation.extend([target_h_obj])
+        # relative object position wrt hand c.o.m. frame
+        inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], p.getQuaternionFromEuler(robot_observation[3:6]))
+        sq_pos_in_hand, sq_orn_in_hand = p.multiplyTransforms(inv_hand_pos, inv_hand_orn,
+                                                              sq_pos, p.getQuaternionFromEuler(sq_eu))
+        sq_euler_in_hand = p.getEulerFromQuaternion(sq_orn_in_hand)
 
-        return np.array(self._observation)
+        observation = np.concatenate([robot_observation, sq_pos, sq_eu, sq_arr])
+
+        return {
+            'observation': observation.copy(),
+            'achieved_goal': np.array(sq_pos_in_hand + sq_euler_in_hand),
+            'desired_goal': self.goal.copy(),
+        }
 
     def step(self, action):
         # scale action
@@ -209,8 +220,9 @@ class iCubGraspResidualGymEnv(gym.Env):
             real_orn = [a*0.08 for a in action[3:6]]
         if self.action_space.shape[-1] == 7:
             fingers = [action[-1]]  # +1 open, -1 close, 0 nothing
-
-        return self.step2([real_pos, real_orn, fingers])
+        sc_action = [real_pos, real_orn, fingers]
+        #np.clip(sc_action, self.action_space.low, self.action_space.high)
+        return self.step2(sc_action)
 
     def step2(self, action):
 
@@ -225,30 +237,30 @@ class iCubGraspResidualGymEnv(gym.Env):
                 time.sleep(time_to_sleep)
 
         # get action from base controller
-        self.get_extended_observation()
-        base_action = self._base_controller.get_next_action(self._observation[:self._robot.getObservationDimension()],
-                                                            self._observation[self._robot.getObservationDimension():])
+        robot_observation = self._robot.getObservation()
+        world_observation = self._world.get_observation()
+        base_action = self._base_controller.get_next_action(robot_observation,
+                                                            world_observation)
 
         final_action = np.add(base_action, action)
-        # final_action[0] = np.clip(final_action[0], -1, 1)
-        # final_action[1] = np.clip(final_action[1], -1, 1)
-        final_action[2] = np.clip(final_action[2], -1, 1)
+        # final_action[0] = np.clip(final_action[0], self.action_space.low, self.action_space.high)
+        # final_action[1] = np.clip(final_action[1], self.action_space.low, self.action_space.high)
+        # final_action[2] = np.clip(final_action[2], self.action_space.low, self.action_space.high)
 
         self._robot.applyAction(final_action[0].tolist() + final_action[1].tolist())
 
         # grasp object
-        if final_action[2] < 0:
-            if not self._robot.isGrasping() and self._robot.checkContactPalm():
-                self._t_grasp += self._time_step * self._action_repeat
-            else:
-                self._t_grasp = 0
+        #if final_action[2] < 0:
+        #    if not self._robot.isGrasping() and self._robot.checkContactPalm():
+        #        self._t_grasp += self._time_step * self._action_repeat
+        #    else:
+        #        self._t_grasp = 0
 
-            if self._t_grasp >= 0.5:
-                obj_pose = self._observation[self._robot.getObservationDimension():self._robot.getObservationDimension()+6]
-                self._robot.graspObject(self._world.obj_id, obj_pose)
+        #   if self._t_grasp >= 0.5:
+        #        self._robot.graspObject(self._world.obj_id, world_observation)
 
-        elif final_action[2] > 0:
-            self._robot.releaseObject()
+        #elif final_action[2] > 0:
+        #    self._robot.releaseObject()
 
         for _ in range(self._action_repeat):
             p.stepSimulation()
@@ -259,13 +271,17 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         obs = self.get_extended_observation()
 
-        done = self._termination()
-        reward = self._compute_reward()
+        info = {
+            'is_success': self._is_success(obs['achieved_goal'], self.goal),
+        }
 
+        done = self._termination() or info['is_success']
+
+        reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
         print("reward")
         print(reward)
 
-        return obs, np.array(reward), np.array(done), {}
+        return obs, np.array(reward), np.array(done), info
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -302,56 +318,42 @@ class iCubGraspResidualGymEnv(gym.Env):
 
     def _termination(self):
 
-        if self.terminated or self._envStepCounter > self._maxSteps:
-            self.get_extended_observation()
-            return np.float32(1.0)
+        obs = self._world.get_observation()
 
-        self.terminated = np.float32(0.0)
-        obs = self.get_extended_observation()[self._robot.getObservationDimension():]
+        if self._envStepCounter > self._maxSteps:
+            return np.float32(1.)
 
         # early termination if object falls
         if self._terminal_failure and self._object_fallen(obs[3], obs[4]):
             print("FALLEN")
-            self.terminated = np.float32(1.0)
+            return np.float32(1.)
 
-        # here check lift for termination
-        if self._object_lifted(obs[2], obs[-1]) and self._t_lift >= 2:
-            print("SUCCESS")
-            self.terminated = np.float32(1.0)
+        return np.float32(0.)
 
-        return self.terminated
+    def _is_success(self, achieved_goal, goal):
+        # Compute distance between goal and the achieved goal.
+        d = goal_distance(achieved_goal[:3], goal[:3])
+        if self._robot.checkContactPalm() and d < self.distance_threshold:
+            return np.float32(1.0)
+        else:
+            return np.float32(0.0)
 
-    def _compute_reward(self):
-        c1, c2, r = np.float32(0.0), np.float32(0.0), np.float32(0.0)
-        w_obs = self.get_extended_observation()[self._robot.getObservationDimension():]
-
-        # cost 1: trajectory as short as possible
-        if not self._robot.isGrasping():
-            c1 = 1/2000 * self._envStepCounter
+    def compute_reward(self, achieved_goal, goal, info):
+        r = np.float32(-1.0)
+        w_obs = self._world.get_observation()
 
         # cost 2: object falls
         if self._object_fallen(w_obs[3], w_obs[4]):
-            c2 = np.float32(10.0)
+            return np.float32(-1.0)
 
-        if self._robot.isGrasping() or self._robot.checkContactPalm():
-            r += 1
-
-        # reward: when object lifted of target_h_object for > 3 secs
-        if self._object_lifted(w_obs[2], w_obs[-1]):
-            self._t_lift += self._time_step*self._action_repeat
-            r += 1
-        else:
-            self._t_lift = 0
-
-        if self._t_lift >= 2:  # secs
-            r += 100
-
-        reward = r - (c1+c2)
-
-        return reward
+        # Compute distance between goal and the achieved goal.
+        d = goal_distance(achieved_goal[:3], goal[:3])
+        if self._robot.checkContactPalm() and d < self.distance_threshold:
+            r = np.float32(0.0)
+        return r
 
     def _object_fallen(self, obj_roll, obj_pitch):
-        return obj_roll <= -1 or obj_roll >= 1 or obj_pitch <= -1 or obj_pitch >= 1
+        return obj_roll <= -0.5 or obj_roll >= 0.5 or obj_pitch <= -0.5 or obj_pitch >= 0.5
 
     def _object_lifted(self, z_obj, h_target, atol=0.05):
         return z_obj >= h_target - atol

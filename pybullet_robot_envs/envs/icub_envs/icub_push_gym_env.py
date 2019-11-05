@@ -60,6 +60,7 @@ class iCubPushGymEnv(gym.Env):
         self._init_dist_hand_obj = []
         self._max_dist_obj_tg = []
         self._dist_to_target = []
+        self._init_hand_pose = []
 
         # Initialize PyBullet simulator
         self._p = p

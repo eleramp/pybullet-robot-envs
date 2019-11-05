@@ -3,10 +3,11 @@ import os, inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
+os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib/superquadriclib/bindings')
 
 print(os.sys.path)
 
-from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_env import iCubGraspResidualGymEnv
+from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_goal_env import iCubGraspResidualGymGoalEnv
 from pybullet_robot_envs import robot_data
 
 import argparse
@@ -22,7 +23,7 @@ import numpy as np
 
 def main(args):
 
-    env = iCubGraspResidualGymEnv(urdfRoot=robot_data.getDataPath(), renders=True, control_arm='l', useOrientation=1, rnd_obj_pose=0.05,  noise_pcl=0.005)
+    env = iCubGraspResidualGymGoalEnv(urdfRoot=robot_data.getDataPath(), renders=True, control_arm='l', useOrientation=1, rnd_obj_pose=0.05,  noise_pcl=0.005)
     env.seed(1)
     motorsIds = []
 
@@ -40,7 +41,7 @@ def main(args):
     #idx = env._p.addUserDebugText(' ', [0, -0.5, 1.2], [1, 0, 0])
 
     for t in range(10000000):
-        #env.render()
+        env.render()
         action = [0.0]*7
         #for motorId in motorsIds:
             #action.append(env._p.readUserDebugParameter(motorId))

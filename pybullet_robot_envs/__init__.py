@@ -29,6 +29,19 @@ register(
                 'terminal_failure': True},
 )
 
+register(
+        id='iCubGraspResidualGoal-v0',
+        entry_point='pybullet_robot_envs.envs:iCubGraspResidualGymGoalEnv',
+        max_episode_steps=1000,
+        kwargs={'control_arm': 'l',
+                'useOrientation': 1,
+                'rnd_obj_pose': 0.05,
+                'noise_pcl': 0.01,
+                'maxSteps': 3000,
+                'renders': False,
+                'terminal_failure': True},
+)
+
 
 register(
         id='pandaReach-v0',

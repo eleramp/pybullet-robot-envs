@@ -278,8 +278,6 @@ class pandaPushGymEnvHER(gym.GoalEnv):
         done = done or self._envStepCounter >= self._maxSteps
         return self._observation, reward, done, info
 
-
-
     def render(self, mode="rgb_array", close=False):
         ## TODO Check the behavior of this function
         if mode != "rgb_array":

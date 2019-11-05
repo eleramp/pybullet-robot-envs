@@ -25,6 +25,7 @@ class WorldFetchEnv:
         self._h_table = []
         self.obj_id = []
         self._rnd_obj_pose = rnd_obj_pose
+        self._obj_init_pose = []
 
         # initialize
         self.reset()
@@ -42,9 +43,12 @@ class WorldFetchEnv:
         #obj_pose = self._sample_pose()
         #self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "duck_vhacd.urdf"), obj_pose)
 
-        obj_pose = self._sample_pose()
+        self._obj_init_pose = self._sample_pose()
         self.obj_id = p.loadURDF(os.path.join(robot_data.getDataPath(), "objects/006_mustard_bottle/mustard_bottle.urdf"),
-                                basePosition=obj_pose[:3], baseOrientation=obj_pose[3:7])
+                                basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7])
+
+    def get_object_init_pose(self):
+        return self._obj_init_pose
 
     def get_table_height(self):
         return self._h_table
@@ -81,7 +85,7 @@ class WorldFetchEnv:
             py = py + noise[1]
             py = np.clip(py, self._ws_lim[1][0], self._ws_lim[1][1])
             # Add uniofrm noise to yaw orientation
-            # quat = p.getQuaternionFromEuler([0, 0, np.random.uniform(low=0, high=2.0 * m.pi)])
+            quat = p.getQuaternionFromEuler([0, 0, np.random.uniform(low=0, high=2.0 * m.pi)])
 
         obj_pose = (px, py, pz) + quat
 
@@ -91,8 +95,8 @@ class WorldFetchEnv:
         if goal_distance(np.array(obj_pose[:3]), np.array(self._obj_pose[:3])) > 0.02 or \
                 goal_distance(np.array(obj_pose[3:6]), np.array(self._obj_pose[3:6])) > 0.5:
             # let the simulation run a bit to stabilize the object motion
-            for _ in range(10):
-                p.stepSimulation()
+            #for _ in range(10):
+             #   p.stepSimulation()
             return True
 
         return False
