@@ -76,7 +76,7 @@ class WorldFetchEnv:
         pz = self._h_table
         quat = p.getQuaternionFromEuler([0.0, 0.0, 0])
 
-        if self._rnd_obj_pose >= 0:
+        if self._rnd_obj_pose > 0:
             # Add a Gaussian noise to position
             mu, sigma = 0, self._rnd_obj_pose
             noise = np.random.normal(mu, sigma, 2)
