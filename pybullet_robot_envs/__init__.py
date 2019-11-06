@@ -2,19 +2,19 @@ import logging
 import gym
 from gym.envs.registration import register
 
-#register(
-#        id='iCubReach-v0',
-#        entry_point='pybullet_robot_envs.envs:iCubReachGymEnv',
-#        max_episode_steps=1000,
-#        kwargs={ 'useIK':1, 'isDiscrete':0, 'control_arm':'l', 'useOrientation':0, 'rnd_obj_pose':1, 'maxSteps':1000},
-#)
+register(
+        id='iCubReach-v0',
+        entry_point='pybullet_robot_envs.envs:iCubReachGymEnv',
+        max_episode_steps=1000,
+        kwargs={ 'useIK':1, 'isDiscrete':0, 'control_arm':'l', 'useOrientation':0, 'rnd_obj_pose':1, 'maxSteps':1000},
+)
 
-#register(
-#        id='iCubPush-v0',
-#        entry_point='pybullet_robot_envs.envs:iCubPushGymEnv',
-#        max_episode_steps=1000,
-#        kwargs={ 'useIK':1, 'isDiscrete':0, 'control_arm':'l', 'useOrientation':0, 'rnd_obj_pose':1, 'maxSteps':1000, 'reward_type':0},
-#)
+register(
+        id='iCubPush-v0',
+        entry_point='pybullet_robot_envs.envs:iCubPushGymEnv',
+        max_episode_steps=1000,
+        kwargs={ 'useIK':1, 'isDiscrete':0, 'control_arm':'l', 'useOrientation':0, 'rnd_obj_pose':1, 'maxSteps':1000, 'reward_type':0},
+)
 
 register(
         id='iCubGraspResidual-v0',
@@ -33,11 +33,11 @@ register(
         id='iCubGraspResidualGoal-v0',
         entry_point='pybullet_robot_envs.envs:iCubGraspResidualGymGoalEnv',
         max_episode_steps=1000,
-        kwargs={'control_arm': 'l',
+        kwargs={'control_arm': 'r',
                 'useOrientation': 1,
                 'rnd_obj_pose': 0.05,
-                'noise_pcl': 0.01,
-                'maxSteps': 3000,
+                'noise_pcl': 0.005,
+                'maxSteps': 2000,
                 'renders': False,
                 'terminal_failure': True},
 )
@@ -69,6 +69,7 @@ register(
 
 # --------------------------- #
 def getList():
+    print("getlist:")
     btenvs = ['- ' + spec.id for spec in gym.envs.registry.all() if spec.id.find('iCub')>=0]
     return btenvs
 

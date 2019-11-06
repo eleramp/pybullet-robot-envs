@@ -1,7 +1,7 @@
 import os, inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
-os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib/superquadriclib/bindings')
+os.sys.path.insert(0, '/home/icub/workspace/INSTALL/lib/superquadriclib/bindings')
 
 import numpy as np
 import quaternion
@@ -36,7 +36,8 @@ class SuperqGraspPlanner:
         self._icub_id = icub_id
         self._obj_id = obj_id
         self._render = render
-        self._visualizer = Visualizer()
+        if self._render:
+            self._visualizer = Visualizer()
         self._pointcloud = PointCloud()
         self._sq_estimator = SuperqEstimatorApp()
         self._grasp_estimator = GraspEstimatorApp()
@@ -126,7 +127,7 @@ class SuperqGraspPlanner:
         w_robot_R_obj = np.array([obj_matrix[0:3], obj_matrix[3:6], obj_matrix[6:9]])
 
         # Get points
-        obj_mesh = pymesh.load_mesh("/home/erampone/workspace/phd/pybullet-robot-envs/pybullet_robot_envs/robot_data/objects/006_mustard_bottle/textured.obj")
+        obj_mesh = pymesh.load_mesh("/home/icub/elena_exp/pybullet-robot-envs/pybullet_robot_envs/robot_data/objects/006_mustard_bottle/textured.obj")
 
         # Create gaussian noise to add to the point's distribution
         mu, sigma = 0.0, self._noise_pcl

@@ -32,7 +32,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
                  rnd_obj_pose=0.05,
                  noise_pcl=0.00,
                  renders=False,
-                 maxSteps = 3000,
+                 maxSteps = 2000,
                  terminal_failure = True):
 
         self._control_arm = control_arm
@@ -53,7 +53,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         self. _noise_pcl = noise_pcl
         self._last_frame_time = 0
         self._terminal_failure = terminal_failure
-        self.distance_threshold = 0.02
+        self.distance_threshold = 0.05
         self._obj0_T_sq =[]
 
         # Initialize PyBullet simulator
@@ -198,13 +198,19 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         sq_pos = [self._superqs[0].center[0][0], self._superqs[0].center[1][0], self._superqs[0].center[2][0]]
         sq_eu = [self._superqs[0].ea[0][0], self._superqs[0].ea[1][0], self._superqs[0].ea[2][0]]
 
-        # relative object position wrt hand c.o.m. frame
+        # relative object pose wrt superq pose
+        inv_sq_pos, inv_sq_orn = p.invertTransform(sq_pos, p.getQuaternionFromEuler(sq_eu))
+        obj_pos_in_sq, obj_orn_in_sq = p.multiplyTransforms(inv_sq_pos, inv_sq_orn,
+                                                            world_observation[:3], p.getQuaternionFromEuler(world_observation[3:6]))
+        obj_eu_in_sq = p.getEulerFromQuaternion(obj_orn_in_sq)
+
+        # relative superq position wrt hand c.o.m. frame
         inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], p.getQuaternionFromEuler(robot_observation[3:6]))
         sq_pos_in_hand, sq_orn_in_hand = p.multiplyTransforms(inv_hand_pos, inv_hand_orn,
                                                               sq_pos, p.getQuaternionFromEuler(sq_eu))
         sq_euler_in_hand = p.getEulerFromQuaternion(sq_orn_in_hand)
 
-        observation = np.concatenate([robot_observation, sq_pos, sq_eu, sq_arr])
+        observation = np.concatenate([robot_observation, sq_pos, sq_eu, sq_arr, obj_pos_in_sq, obj_eu_in_sq])
 
         return {
             'observation': observation.copy(),
@@ -214,10 +220,10 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
 
     def step(self, action):
         # scale action
-        real_pos = [a*0.05 for a in action[:3]]
+        real_pos = [a*0.1 for a in action[:3]]
         real_orn = []
         if self.action_space.shape[-1] >= 6:
-            real_orn = [a*0.08 for a in action[3:6]]
+            real_orn = [a*0.8 for a in action[3:6]]
         if self.action_space.shape[-1] == 7:
             fingers = [action[-1]]  # +1 open, -1 close, 0 nothing
         sc_action = [real_pos, real_orn, fingers]
@@ -278,8 +284,8 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         done = self._termination() or info['is_success']
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
-        print("reward")
-        print(reward)
+        #print("reward")
+        #print(reward)
 
         return obs, np.array(reward), np.array(done), info
 
