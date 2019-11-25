@@ -89,7 +89,10 @@ class iCubPushGymEnv(gym.Env):
 
         # initialize simulation environment
         self.seed()
-        self.reset()
+        obs = self.reset()
+
+        observationDim = len(obs)
+        print("observation Dim {}".format(observationDim))
 
     def create_spaces(self):
         # Configure observation limits
