@@ -78,7 +78,7 @@ class WorldFetchEnv:
 
         px = x_min + 0.5 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.5 * (self._ws_lim[1][1] - self._ws_lim[1][0])
-        pz = self._h_table
+        pz = self._h_table+0.07
         quat = p.getQuaternionFromEuler([0.0, 0.0, 0])
 
         if self._rnd_obj_pose > 0:

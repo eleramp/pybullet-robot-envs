@@ -105,8 +105,6 @@ class iCubGraspResidualGymEnv(gym.Env):
         p.setTimeStep(self._time_step)
         self._envStepCounter = 0
 
-        p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0])
-
         self._robot.reset()
         self._world.reset()
 
@@ -125,11 +123,9 @@ class iCubGraspResidualGymEnv(gym.Env):
         self._base_controller.reset(robot_id=self._robot.icubId, obj_id=self._world.obj_id,
                                     starting_pose=np.array(self._robot.getObservation()))
 
-        self._base_controller.set_object_info(self._world.get_object_shape_info())
+        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.icubId))
 
         self.compute_grasp_pose()
-
-        self.get_extended_observation()
 
         self.debug_gui()
         p.stepSimulation()

@@ -37,7 +37,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
                  terminal_failure = True):
 
         self._control_arm = control_arm
-        self._time_step = 1./240.  # 4 ms
+        self._time_step = 1./60.  # 4 ms
         self._useOrientation = useOrientation
         self._urdfRoot = urdfRoot
         self._action_repeat = actionRepeat
@@ -124,11 +124,13 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         self._world.debug_gui()
 
         self._base_controller.reset(robot_id=self._robot.icubId, obj_id=self._world.obj_id,
-                                    starting_pose=np.array(self._robot.getObservation()))
+                                    starting_pose=np.array(self._robot.getObservation()[:6]))
+
+        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.icubId))
 
         self.compute_grasp_pose()
-        self.debug_gui()
 
+        self.debug_gui()
         p.stepSimulation()
 
         self.goal = np.array(self._grasp_pose)
@@ -233,7 +235,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         real_pos = [a*0.1 for a in action[:3]]
         real_orn = []
         if self.action_space.shape[-1] >= 6:
-            real_orn = [a*0.8 for a in action[3:6]]
+            real_orn = [a for a in action[3:6]]
         if self.action_space.shape[-1] == 7:
             fingers = [action[-1]]  # +1 open, -1 close, 0 nothing
         sc_action = [real_pos, real_orn, fingers]

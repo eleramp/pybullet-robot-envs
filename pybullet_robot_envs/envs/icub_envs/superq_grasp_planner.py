@@ -11,6 +11,7 @@ from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaterni
 
 import pymesh
 
+import robot_data
 import superquadric_bindings
 from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimatorApp, Visualizer
 import config_superq_grasp_planner as cfg
@@ -91,6 +92,9 @@ class SuperqGraspPlanner:
 
         return
 
+    def set_robot_base_pose(self, pose):
+        self._robot_base_pose = pose
+
     def set_object_info(self, obj_info):
         self._obj_info = obj_info
 
@@ -126,7 +130,8 @@ class SuperqGraspPlanner:
         w_robot_R_obj = np.array([obj_matrix[0:3], obj_matrix[3:6], obj_matrix[6:9]])
 
         # Get points
-        obj_mesh = pymesh.load_mesh("/home/erampone/workspace/phd/my_git/pybullet-robot-envs/pybullet_robot_envs/robot_data/objects/006_mustard_bottle/textured.obj")
+        #obj_mesh = pymesh.load_mesh(os.path.join(robot_data.getDataPath(), "objects/006_mustard_bottle/textured.obj"))
+        obj_mesh = pymesh.load_mesh(self._obj_info[4])
 
         # Create gaussian noise to add to the point's distribution
         mu, sigma = 0.0, self._noise_pcl
@@ -153,10 +158,10 @@ class SuperqGraspPlanner:
                     rnd = np.random.random() < 0.005
 
                 points.push_back(v3)
-                colors.push_back([255,0,0])
-                if i % 100 is 0:
-                    p.addUserDebugLine(v3, [v3[0] + 0.001, v3[1], v3[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
-                                       lifeTime=30, parentObjectUniqueId=1)
+                colors.push_back([255, 0, 0])
+                # if i % 100 is 0:
+                #    p.addUserDebugLine(v3, [v3[0] + 0.001, v3[1], v3[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
+                #                       lifeTime=30, parentObjectUniqueId=0)
 
         if points.size() >= cfg.sq_model['minimum_points']:
             self._pointcloud.setPoints(points)
@@ -313,13 +318,13 @@ class SuperqGraspPlanner:
             # print(" target pose: {} \n next pose: {} ".format(gp_URDF_link_frame[0], next_pos))
 
             # --- Orientation --- #
-            if idx is i_path[-1]:
+            if idx >= i_path[-4]:
 
                 # relative quaternion from starting to grasping pose
                 sp_q_gp = np.conj(w_q_sp) * w_q_gp
                 sp_ax_gp = quaternion.as_rotation_vector(sp_q_gp)
 
-                #sp_ax_gp[0] = idx * sp_ax_gp[0]
+                sp_ax_gp[0] = idx * sp_ax_gp[0]
                 next_orn = quaternion.as_float_array(w_q_sp * quaternion.from_rotation_vector(sp_ax_gp))
                 # print(" target quat: {} \n next quat: {} ".format(w_q_gp, next_orn))
                 next_eu = p.getEulerFromQuaternion([next_orn[1], next_orn[2], next_orn[3], next_orn[0]])
@@ -329,7 +334,7 @@ class SuperqGraspPlanner:
 
             self._approach_path.append([next_pos.tolist(), list(next_eu)])
 
-        self._debug_gui(self._approach_path)
+        # self._debug_gui(self._approach_path)
 
         self._approach_path.reverse()
         return True
