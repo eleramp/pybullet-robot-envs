@@ -26,9 +26,10 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
 
     def __init__(self,
                  urdfRoot=robot_data.getDataPath(),
-                 actionRepeat=30,
+                 actionRepeat=20,
                  control_arm='l',
                  useOrientation=0,
+                 use_superq=0,
                  rnd_obj_pose=0.05,
                  noise_pcl=0.00,
                  renders=False,
@@ -55,6 +56,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         self._terminal_failure = terminal_failure
         self.distance_threshold = 0.05
         self._obj0_T_sq =[]
+        self._use_superq = use_superq
 
         # Initialize PyBullet simulator
         self._p = p
@@ -121,8 +123,6 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         self._robot.debug_gui()
         self._world.debug_gui()
 
-
-
         self._base_controller.reset(robot_id=self._robot.icubId, obj_id=self._world.obj_id,
                                     starting_pose=np.array(self._robot.getObservation()))
 
@@ -131,7 +131,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
 
         p.stepSimulation()
 
-        self.goal = self._compute_goal()
+        self.goal = np.array(self._grasp_pose)
 
         self._t_grasp, self._t_lift = 0, 0
 
@@ -181,7 +181,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         print("grasp pose: {}".format(self._grasp_pose))
 
         if self._renders:
-            self._base_controller._visualizer.render()
+            self._base_controller._visualizer.visualize()
 
         return self._grasp_pose
 
@@ -191,30 +191,40 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         world_observation = self._world.get_observation()
 
         # get superquadric params of dimension and shape
-        sq_dim = self._superqs[0].dim
-        sq_exp = self._superqs[0].exp
-        sq_arr = np.array([sq_dim[0][0], sq_dim[1][0], sq_dim[2][0], sq_exp[0][0], sq_exp[1][0]])
+        if self._use_superq:
+            sq_dim = self._superqs[0].dim
+            sq_exp = self._superqs[0].exp
+            sq_arr = np.array([sq_dim[0][0], sq_dim[1][0], sq_dim[2][0], sq_exp[0][0], sq_exp[1][0]])
 
-        sq_pos = [self._superqs[0].center[0][0], self._superqs[0].center[1][0], self._superqs[0].center[2][0]]
-        sq_eu = [self._superqs[0].ea[0][0], self._superqs[0].ea[1][0], self._superqs[0].ea[2][0]]
+            sq_pos = [self._superqs[0].center[0][0], self._superqs[0].center[1][0], self._superqs[0].center[2][0]]
+            sq_eu = [self._superqs[0].ea[0][0], self._superqs[0].ea[1][0], self._superqs[0].ea[2][0]]
 
-        # relative object pose wrt superq pose
-        inv_sq_pos, inv_sq_orn = p.invertTransform(sq_pos, p.getQuaternionFromEuler(sq_eu))
-        obj_pos_in_sq, obj_orn_in_sq = p.multiplyTransforms(inv_sq_pos, inv_sq_orn,
-                                                            world_observation[:3], p.getQuaternionFromEuler(world_observation[3:6]))
-        obj_eu_in_sq = p.getEulerFromQuaternion(obj_orn_in_sq)
+            # relative object pose wrt superq pose
+            inv_sq_pos, inv_sq_orn = p.invertTransform(sq_pos, p.getQuaternionFromEuler(sq_eu))
+            obj_pos_in_sq, obj_orn_in_sq = p.multiplyTransforms(inv_sq_pos, inv_sq_orn,
+                                                                world_observation[:3], p.getQuaternionFromEuler(world_observation[3:6]))
+            obj_eu_in_sq = p.getEulerFromQuaternion(obj_orn_in_sq)
 
-        # relative superq position wrt hand c.o.m. frame
-        inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], p.getQuaternionFromEuler(robot_observation[3:6]))
-        sq_pos_in_hand, sq_orn_in_hand = p.multiplyTransforms(inv_hand_pos, inv_hand_orn,
-                                                              sq_pos, p.getQuaternionFromEuler(sq_eu))
-        sq_euler_in_hand = p.getEulerFromQuaternion(sq_orn_in_hand)
+            # relative superq position wrt hand c.o.m. frame
+            inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], p.getQuaternionFromEuler(robot_observation[3:6]))
+            sq_pos_in_hand, sq_orn_in_hand = p.multiplyTransforms(inv_hand_pos, inv_hand_orn,
+                                                                  sq_pos, p.getQuaternionFromEuler(sq_eu))
+            sq_euler_in_hand = p.getEulerFromQuaternion(sq_orn_in_hand)
 
-        observation = np.concatenate([robot_observation, sq_pos, sq_eu, sq_arr, obj_pos_in_sq, obj_eu_in_sq])
+            observation = np.concatenate([robot_observation, sq_pos, sq_eu, sq_arr, obj_pos_in_sq, obj_eu_in_sq])
+        else:
+            # relative superq position wrt hand c.o.m. frame
+            inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3],
+                                                           p.getQuaternionFromEuler(robot_observation[3:6]))
+            obj_pos_in_hand, obj_orn_in_hand = p.multiplyTransforms(inv_hand_pos, inv_hand_orn,
+                                                                    world_observation[:3],
+                                                                    p.getQuaternionFromEuler(world_observation[3:6]))
+            obj_euler_in_hand = p.getEulerFromQuaternion(obj_orn_in_hand)
+            observation = np.concatenate([robot_observation, world_observation, obj_pos_in_hand, obj_euler_in_hand])
 
         return {
             'observation': observation.copy(),
-            'achieved_goal': np.array(sq_pos_in_hand + sq_euler_in_hand),
+            'achieved_goal': np.array(robot_observation[:6]),
             'desired_goal': self.goal.copy(),
         }
 
@@ -359,7 +369,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         return r
 
     def _object_fallen(self, obj_roll, obj_pitch):
-        return obj_roll <= -0.5 or obj_roll >= 0.5 or obj_pitch <= -0.5 or obj_pitch >= 0.5
+        return obj_roll <= -1 or obj_roll >= 1 or obj_pitch <= -1 or obj_pitch >= 1
 
     def _object_lifted(self, z_obj, h_target, atol=0.05):
         return z_obj >= h_target - atol

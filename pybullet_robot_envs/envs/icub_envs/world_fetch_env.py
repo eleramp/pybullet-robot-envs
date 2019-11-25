@@ -16,12 +16,12 @@ class WorldFetchEnv:
                  workspace_lim=None):
 
         if workspace_lim is None:
-            workspace_lim = [[0.25, 0.52], [-0.2, 0.2], [0.5, 1.0]]
+            workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
 
         self._cam_dist = 1.3
         self._cam_yaw = 180
         self._cam_pitch = -40
-        self._ws_lim = workspace_lim
+        self._ws_lim = tuple(workspace_lim)
         self._h_table = []
         self.obj_id = []
         self._rnd_obj_pose = rnd_obj_pose
@@ -71,7 +71,12 @@ class WorldFetchEnv:
         return observation
 
     def _sample_pose(self):
-        px = self._ws_lim[0][0] + 0.5 * (self._ws_lim[0][1] - self._ws_lim[0][0])
+
+        # ws_lim = self._ws_lim
+        x_min = self._ws_lim[0][0] + 0.064668
+        x_max = self._ws_lim[0][1] - 0.05
+
+        px = x_min + 0.5 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.5 * (self._ws_lim[1][1] - self._ws_lim[1][0])
         pz = self._h_table
         quat = p.getQuaternionFromEuler([0.0, 0.0, 0])
@@ -80,12 +85,15 @@ class WorldFetchEnv:
             # Add a Gaussian noise to position
             mu, sigma = 0, self._rnd_obj_pose
             noise = np.random.normal(mu, sigma, 2)
+
             px = px + noise[0]
-            px = np.clip(px, self._ws_lim[0][0], self._ws_lim[0][1])
+            px = np.clip(px, x_min, x_max)
+
             py = py + noise[1]
             py = np.clip(py, self._ws_lim[1][0], self._ws_lim[1][1])
+
             # Add uniofrm noise to yaw orientation
-            quat = p.getQuaternionFromEuler([0, 0, np.random.uniform(low=0, high=2.0 * m.pi)])
+            # quat = p.getQuaternionFromEuler([0, 0, np.random.uniform(low=0, high=2.0 * m.pi)])
 
         obj_pose = (px, py, pz) + quat
 
