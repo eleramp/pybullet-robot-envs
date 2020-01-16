@@ -26,10 +26,10 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
 
     def __init__(self,
                  urdfRoot=robot_data.getDataPath(),
-                 actionRepeat=20,
+                 actionRepeat=1,
                  control_arm='l',
                  useOrientation=0,
-                 use_superq=0,
+                 use_superq=1,
                  rnd_obj_pose=0.05,
                  noise_pcl=0.00,
                  renders=False,
@@ -46,9 +46,9 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         self._renders = renders
         self._maxSteps = maxSteps
         self.terminated = 0
-        self._cam_dist = 1.3
-        self._cam_yaw = -90
-        self._cam_pitch = -40
+        self._cam_dist = 0.3
+        self._cam_yaw = 0.0
+        self._cam_pitch = -30
         self._t_grasp, self._t_lift = 0, 0
         self._rnd_obj_pose = rnd_obj_pose
         self. _noise_pcl = noise_pcl
@@ -213,7 +213,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
                                                                   sq_pos, p.getQuaternionFromEuler(sq_eu))
             sq_euler_in_hand = p.getEulerFromQuaternion(sq_orn_in_hand)
 
-            observation = np.concatenate([robot_observation, sq_pos, sq_eu, sq_arr, obj_pos_in_sq, obj_eu_in_sq])
+            observation = np.concatenate([robot_observation, sq_pos, sq_eu, sq_arr, world_observation, obj_pos_in_sq, obj_eu_in_sq])
         else:
             # relative superq position wrt hand c.o.m. frame
             inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3],
@@ -309,7 +309,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
         if mode != "rgb_array":
           return np.array([])
 
-        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.icubId)
+        base_pos, _ = self._p.getBasePositionAndOrientation(self._world.obj_id)
         view_matrix = self._p.computeViewMatrixFromYawPitchRoll(
             cameraTargetPosition=base_pos,
             distance=self._cam_dist,
@@ -319,7 +319,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv):
             upAxisIndex=2)
         proj_matrix = self._p.computeProjectionMatrixFOV(
             fov=60, aspect=float(RENDER_WIDTH)/RENDER_HEIGHT,
-            nearVal=0.1, farVal=100.0)
+            nearVal=0.05, farVal=0.5)
         (_, _, px, _, _) = self._p.getCameraImage(
             width=RENDER_WIDTH, height=RENDER_HEIGHT, viewMatrix=view_matrix,
             projectionMatrix=proj_matrix, renderer=self._p.ER_BULLET_HARDWARE_OPENGL)

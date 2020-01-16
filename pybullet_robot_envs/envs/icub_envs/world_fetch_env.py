@@ -77,7 +77,7 @@ class WorldFetchEnv:
         x_max = self._ws_lim[0][1] - 0.05
 
         px = x_min + 0.5 * (x_max - x_min)
-        py = self._ws_lim[1][0] + 0.5 * (self._ws_lim[1][1] - self._ws_lim[1][0])
+        py = self._ws_lim[1][0] + 0.6 * (self._ws_lim[1][1] - self._ws_lim[1][0])
         pz = self._h_table+0.07
         quat = p.getQuaternionFromEuler([0.0, 0.0, 0])
 
@@ -86,14 +86,14 @@ class WorldFetchEnv:
             mu, sigma = 0, self._rnd_obj_pose
             noise = np.random.normal(mu, sigma, 2)
 
-            px = px + noise[0]
-            px = np.clip(px, x_min, x_max)
+            # px = px + noise[0]
+            # px = np.clip(px, x_min, x_max)
 
-            py = py + noise[1]
-            py = np.clip(py, self._ws_lim[1][0], self._ws_lim[1][1])
+            # py = py + noise[1]
+            # py = np.clip(py, self._ws_lim[1][0], self._ws_lim[1][1])
 
             # Add uniofrm noise to yaw orientation
-            # quat = p.getQuaternionFromEuler([0, 0, np.random.uniform(low=0, high=2.0 * m.pi)])
+            quat = p.getQuaternionFromEuler([0, 0, np.random.uniform(low=0, high=2.0 * m.pi)])
 
         obj_pose = (px, py, pz) + quat
 

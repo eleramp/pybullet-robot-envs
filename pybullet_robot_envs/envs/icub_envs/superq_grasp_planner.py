@@ -139,9 +139,11 @@ class SuperqGraspPlanner:
 
         points = superquadric_bindings.deque_Vector3d()
         colors = superquadric_bindings.vector_vector_uchar()
-        counter = 10000
+        counter = 1
         rnd = 0
         for i, v in enumerate(obj_mesh.vertices):
+            #if i%20 > 0:
+            #    continue
             v0 = v * obj_scale
             v1 = collision_dcm.dot(v0) + collision_pose
             v2 = w_robot_R_obj.dot(v1)
@@ -153,12 +155,13 @@ class SuperqGraspPlanner:
                 if rnd > 0 and counter > 0:
                     counter -= 1
                     v3 += noise[i]
+                    #continue
                 else:
                     counter = 10000
-                    rnd = np.random.random() < 0.005
+                    rnd = np.random.random() < 0.001
 
                 points.push_back(v3)
-                colors.push_back([255, 0, 0])
+                colors.push_back([255, 255, 0])
                 # if i % 100 is 0:
                 #    p.addUserDebugLine(v3, [v3[0] + 0.001, v3[1], v3[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
                 #                       lifeTime=30, parentObjectUniqueId=0)
@@ -300,7 +303,7 @@ class SuperqGraspPlanner:
                                                 p.getQuaternionFromEuler((0, 0, 0)))
 
         # linear path from initial to grasping pose
-        n_pt = 20
+        n_pt = 10
         i_path = [i/n_pt for i in range(0, n_pt+1, 2)]
         delta_pos = np.subtract(gp_URDF_link[0], sp_URDF_link[0])
 
@@ -334,7 +337,7 @@ class SuperqGraspPlanner:
 
             self._approach_path.append([next_pos.tolist(), list(next_eu)])
 
-        # self._debug_gui(self._approach_path)
+        self._debug_gui(self._approach_path)
 
         self._approach_path.reverse()
         return True
