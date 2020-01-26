@@ -11,7 +11,6 @@ from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaterni
 
 import pymesh
 
-import robot_data
 import superquadric_bindings
 from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimatorApp, Visualizer
 import config_superq_grasp_planner as cfg
@@ -27,8 +26,8 @@ class SuperqGraspPlanner:
         self._superqs = superquadric_bindings.vector_superquadric()
         self._robot_base_pose = robot_base_pose
         # offset between icub hand's ref.frame in PyBullet and on the real robot --> TO DO: make it less hard coded
-        self._icub_hand_right_orn = [-m.pi/2, 0.0, m.pi]
-        self._icub_hand_left_orn = [m.pi/2, 0.0, 0.0]
+        self._icub_hand_right_orn = [0.0, -m.pi/2, m.pi/2]
+        self._icub_hand_left_orn =[0.0, -m.pi/2, m.pi/2]
         self._starting_pose = []
         self._best_grasp_pose = []
         self._approach_path = []
@@ -130,7 +129,6 @@ class SuperqGraspPlanner:
         w_robot_R_obj = np.array([obj_matrix[0:3], obj_matrix[3:6], obj_matrix[6:9]])
 
         # Get points
-        #obj_mesh = pymesh.load_mesh(os.path.join(robot_data.getDataPath(), "objects/006_mustard_bottle/textured.obj"))
         obj_mesh = pymesh.load_mesh(self._obj_info[4])
 
         # Create gaussian noise to add to the point's distribution
@@ -305,35 +303,31 @@ class SuperqGraspPlanner:
         # linear path from initial to grasping pose
         n_pt = 10
         i_path = [i/n_pt for i in range(0, n_pt+1, 2)]
-        delta_pos = np.subtract(gp_URDF_link[0], sp_URDF_link[0])
+        delta_pos = np.subtract(self._best_grasp_pose[:3], self._starting_pose[:3])  # np.subtract(gp_URDF_link[0], sp_URDF_link[0])
 
         # quaternion of starting pose
-        q_sp = sp_URDF_link[1]
+        q_sp = p.getQuaternionFromEuler(self._starting_pose[3:6])  # sp_URDF_link[1]
         w_q_sp = np.quaternion(q_sp[3], q_sp[0], q_sp[1], q_sp[2])
 
         # quaternion of grasping (target) pose
-        q_gp = gp_URDF_link[1]
+        q_gp = p.getQuaternionFromEuler(self._best_grasp_pose[3:6])  # gp_URDF_link[1]
         w_q_gp = np.quaternion(q_gp[3], q_gp[0], q_gp[1], q_gp[2])
 
         for idx in i_path:
             # --- Position --- #
-            next_pos = np.add(sp_URDF_link[0], idx * delta_pos)
+            next_pos = np.add(self._starting_pose[:3], idx * delta_pos) # np.add(sp_URDF_link[0], idx * delta_pos)
             # print(" target pose: {} \n next pose: {} ".format(gp_URDF_link_frame[0], next_pos))
 
             # --- Orientation --- #
-            if idx >= i_path[-4]:
+            # relative quaternion from starting to grasping pose
+            sp_q_gp = np.conj(w_q_sp) * w_q_gp
+            sp_ax_gp = quaternion.as_rotation_vector(sp_q_gp)
 
-                # relative quaternion from starting to grasping pose
-                sp_q_gp = np.conj(w_q_sp) * w_q_gp
-                sp_ax_gp = quaternion.as_rotation_vector(sp_q_gp)
+            sp_ax_gp[0] = idx * sp_ax_gp[0]
+            next_orn = quaternion.as_float_array(w_q_sp * quaternion.from_rotation_vector(sp_ax_gp))
 
-                sp_ax_gp[0] = idx * sp_ax_gp[0]
-                next_orn = quaternion.as_float_array(w_q_sp * quaternion.from_rotation_vector(sp_ax_gp))
-                # print(" target quat: {} \n next quat: {} ".format(w_q_gp, next_orn))
-                next_eu = p.getEulerFromQuaternion([next_orn[1], next_orn[2], next_orn[3], next_orn[0]])
-
-            else:
-                next_eu = p.getEulerFromQuaternion(sp_URDF_link[1])
+            next_eu = p.getEulerFromQuaternion([next_orn[1], next_orn[2], next_orn[3], next_orn[0]])
+            print(" target eu: {} \n next eu: {} ".format(self._starting_pose[3:6], next_eu))
 
             self._approach_path.append([next_pos.tolist(), list(next_eu)])
 

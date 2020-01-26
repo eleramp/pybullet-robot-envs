@@ -45,7 +45,7 @@ class iCubHandsEnv():
         self._home_motor_pose = []
 
         self._workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
-        self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2]]
+        self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi, m.pi]]
 
         self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default
 
@@ -218,9 +218,9 @@ class iCubHandsEnv():
 
             # transform the new pose from COM coordinate to link coordinate
             if self._control_arm is 'r':
-                COM_t0_link_hand_pos = (0.064668, -0.0056, -0.022681)
+                COM_t0_link_hand_pos = (-0.011682, 0.051682, -0.000577)
             else:
-                COM_t0_link_hand_pos = (-0.064768, -0.00563, -0.02266)
+                COM_t0_link_hand_pos = (-0.011682, 0.051355, 0.000577)
 
             link_hand_pose = p.multiplyTransforms(new_pos, new_quat_orn,
                                                   COM_t0_link_hand_pos, p.getQuaternionFromEuler((0, 0, 0)))
@@ -232,7 +232,8 @@ class iCubHandsEnv():
                                                       jointRanges=self.jr, restPoses=self.rs)
 
             # workaround to block joints of not-controlled arm
-            joints_to_block = self._indices_left_arm if self._control_arm == 'r' else self._indices_right_arm
+            joints_to_block = list(self._indices_left_hand) + list(self._indices_right_hand)
+            joints_to_block += list(self._indices_left_arm) if self._control_arm == 'r' else list(self._indices_right_arm)
 
             if self._use_simulation:
                 for i in range(self._num_joints):
@@ -249,7 +250,6 @@ class iCubHandsEnv():
                                                 jointIndex=i,
                                                 controlMode=p.POSITION_CONTROL,
                                                 targetPosition=jointPoses[i],
-                                                maxVelocity=0.2,
                                                 force=50)
             else:
                 # reset the joint state (ignoring all dynamics, not recommended to use during simulation)

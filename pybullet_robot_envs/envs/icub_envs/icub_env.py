@@ -39,7 +39,7 @@ class iCubEnv:
         self._home_hand_pose = []
 
         self._workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
-        self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2]]
+        self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi, m.pi]]
 
         self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default
 
@@ -100,10 +100,8 @@ class iCubEnv:
         # set initial hand pose
         if self._control_arm == 'l':
             self._home_hand_pose = [0.26, 0.3, 0.9, 0, 0, 0]  # x,y,z, roll,pitch,yaw
-            self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2]]
         else:
             self._home_hand_pose = [0.26, -0.3, 0.9, 0, 0, m.pi]
-            self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [m.pi/2, m.pi/2*3]]
 
         if self._use_IK:
             self.apply_action(self._home_hand_pose)

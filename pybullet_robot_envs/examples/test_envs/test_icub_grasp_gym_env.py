@@ -9,7 +9,6 @@ print(os.sys.path)
 
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_env import iCubGraspResidualGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_goal_env import iCubGraspResidualGymGoalEnv
-from pybullet_robot_envs import robot_data
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -24,7 +23,7 @@ import numpy as np
 
 def main(args):
 
-    env = iCubGraspResidualGymGoalEnv(urdfRoot=robot_data.getDataPath(), renders=True, control_arm='r', useOrientation=1, rnd_obj_pose=0.05,  noise_pcl=0.00)
+    env = iCubGraspResidualGymGoalEnv( renders=True, control_arm='r', obj_pose_rnd_std=0.05,  noise_pcl=0.00)
     env.seed(1)
     motorsIds = []
 
@@ -35,7 +34,7 @@ def main(args):
     motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dv, dv, 0.0))
     motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dv, dv, 0.0))
     motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("close_open", -dv, dv, 0.0))
+    # motorsIds.append(env._p.addUserDebugParameter("close_open", -dv, dv, 0.0))
 
     done = False
     #env._p.addUserDebugText('current hand position', [0, -0.5, 1.4], [1.1, 0, 0])
