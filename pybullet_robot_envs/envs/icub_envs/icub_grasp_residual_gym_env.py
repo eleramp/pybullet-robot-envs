@@ -6,6 +6,7 @@ import numpy as np
 import time
 import pybullet as p
 import math as m
+import quaternion
 
 from pybullet_robot_envs.envs.icub_envs.icub_env_with_hands import iCubHandsEnv
 from pybullet_robot_envs.envs.icub_envs.icub_env import iCubEnv
@@ -255,6 +256,10 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         # set new action
         action = np.clip(action, self.action_space.low, self.action_space.high)
+        pos_action = action[:3]
+        eu_action = action[3:6]
+        quat_action = p.getQuaternionFromEuler(eu_action)
+
 
         # get action from base controller
         robot_obs, _ = self._robot.get_observation()
@@ -262,9 +267,15 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         base_action = self._base_controller.get_next_action(robot_obs, world_obs)
 
-        final_action = np.add(base_action[0].tolist() + base_action[1].tolist(), action[:6])
+        final_action_pos = np.add(base_action[0], pos_action)
+        final_action_quat = np.quaternion(base_action[1][3], base_action[1][0], base_action[1][1], base_action[1][2]) * \
+                          np.quaternion(quat_action[3], quat_action[0], quat_action[1], quat_action[2])
+        final_action_quat = quaternion.as_float_array(final_action_quat)
+        final_action_quat_1 = [final_action_quat[1], final_action_quat[2], final_action_quat[3], final_action_quat[0]]
 
-        self._robot.apply_action(final_action)
+        #final_action = np.add(base_action[0].tolist() + base_action[1].tolist(), action[:6])
+
+        self._robot.apply_action(final_action_pos.tolist() + final_action_quat_1)
 
         for _ in range(self._action_repeat):
             p.stepSimulation()

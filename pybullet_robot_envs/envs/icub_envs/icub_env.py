@@ -99,9 +99,9 @@ class iCubEnv:
 
         # set initial hand pose
         if self._control_arm == 'l':
-            self._home_hand_pose = [0.26, 0.3, 0.9, 0, 0, 0]  # x,y,z, roll,pitch,yaw
+            self._home_hand_pose = [0.2, 0.26, 0.8, 0, 0, 0]  # x,y,z, roll,pitch,yaw
         else:
-            self._home_hand_pose = [0.26, -0.3, 0.9, 0, 0, m.pi]
+            self._home_hand_pose = [0.2, -0.26, 0.8, 0, 0, m.pi]
 
         if self._use_IK:
             self.apply_action(self._home_hand_pose)
@@ -169,9 +169,11 @@ class iCubEnv:
     def apply_action(self, action):
         if self._use_IK:
 
-            if not len(action) >= 3:
-                raise AssertionError('number of action commands must be minimum 3: (dx,dy,dz)', len(action))
-
+            if not (len(action) == 3 or len(action) == 6 or len(action) == 7):
+                raise AssertionError('number of action commands must be \n- 3: (dx,dy,dz)'
+                                     '\n- 6: (dx,dy,dz,droll,dpitch,dyaw)'
+                                     '\n- 7: (dx,dy,dz,qx,qy,qz,w)'
+                                     '\ninstead it is: ', len(action))
             dx, dy, dz = action[:3]
 
             new_pos = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], dx)),
@@ -181,7 +183,7 @@ class iCubEnv:
             if not self._control_orientation:
                 new_quat_orn = p.getQuaternionFromEuler(self._home_hand_pose[3:6])
 
-            elif len(action) >= 6:
+            elif len(action) == 6:
                 droll, dpitch, dyaw = action[3:6]
 
                 new_eu_orn = [min(self._eu_lim[0][1], max(self._eu_lim[0][0], droll)),
@@ -190,6 +192,8 @@ class iCubEnv:
 
                 new_quat_orn = p.getQuaternionFromEuler(new_eu_orn)
 
+            elif len(action) == 7:
+                new_quat_orn = action[3:7]
             else:
                 new_quat_orn = p.getLinkState(self.robot_id, self._end_eff_idx)[5]
 

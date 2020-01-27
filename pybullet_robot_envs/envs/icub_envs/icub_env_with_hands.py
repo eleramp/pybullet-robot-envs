@@ -38,8 +38,10 @@ class iCubHandsEnv():
         self._home_left_arm = [-29.4, 40.0, 0, 70, 0, 0, 0]
         self._home_right_arm = [-29.4, 40.0, 0, 70, 0, 0, 0]
 
-        self._home_left_hand = [0] * len(self._indices_right_hand)
+        self._home_left_hand = [0] * len(self._indices_left_hand)
+        self._home_left_hand[-4] = 90.0
         self._home_right_hand = [0] * len(self._indices_right_hand)
+        self._home_right_hand[-4] = 90.0
 
         self._home_hand_pose = []
         self._home_motor_pose = []
@@ -85,7 +87,7 @@ class iCubHandsEnv():
             p.resetJointState(self.robot_id, i, self._home_right_arm[count] / 180 * m.pi)
 
         for count, i in enumerate(self._indices_left_hand):
-            p.resetJointState(self.robot_id, i, self._home_left_hand[count])
+            p.resetJointState(self.robot_id, i, self._home_left_hand[count] / 180 * m.pi)
 
         for count, i in enumerate(self._indices_right_hand):
             p.resetJointState(self.robot_id, i, self._home_right_hand[count] / 180 * m.pi)
@@ -116,10 +118,10 @@ class iCubHandsEnv():
 
         # set initial hand pose
         if self._control_arm == 'l':
-            self._home_hand_pose = [0.26, 0.25, 0.9, 0, 0, m.pi/2]  # x,y,z, roll,pitch,yaw
+            self._home_hand_pose = [0.2, 0.26, 0.85, 0, 0, m.pi/2]  # x,y,z, roll,pitch,yaw
             self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [0, m.pi]]
         else:
-            self._home_hand_pose = [0.26, -0.25, 0.9, 0, 0, m.pi/2]
+            self._home_hand_pose = [0.2, -0.26, 0.85, 0, 0, m.pi/2]
             self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, m.pi]]
 
         # self.eu_lim[0] = np.add(self.eu_lim[0], self.home_hand_pose[3])
@@ -127,7 +129,7 @@ class iCubHandsEnv():
         # self.eu_lim[2] = np.add(self.eu_lim[2], self.home_hand_pose[5])
 
         if self._use_IK:
-            self.apply_action(self._home_hand_pose)
+            self.apply_action(self._home_hand_pose[:3])
 
     def delete_simulated_robot(self):
         # Remove the robot from the simulation
@@ -192,8 +194,11 @@ class iCubHandsEnv():
     def apply_action(self, action):
         if self._use_IK:
 
-            if not len(action) >= 3:
-                raise AssertionError('number of action commands must be minimum 3: (dx,dy,dz)', len(action))
+            if not (len(action) == 3 or len(action) == 6 or len(action) == 7):
+                raise AssertionError('number of action commands must be \n- 3: (dx,dy,dz)'
+                                     '\n- 6: (dx,dy,dz,droll,dpitch,dyaw)'
+                                     '\n- 7: (dx,dy,dz,qx,qy,qz,w)'
+                                     '\ninstead it is: ', len(action))
 
             dx, dy, dz = action[:3]
 
@@ -204,7 +209,7 @@ class iCubHandsEnv():
             if not self._control_orientation:
                 new_quat_orn = p.getQuaternionFromEuler(self._home_hand_pose[3:6])
 
-            elif len(action) >= 6:
+            elif len(action) == 6:
                 droll, dpitch, dyaw = action[3:6]
 
                 new_eu_orn = [min(self._eu_lim[0][1], max(self._eu_lim[0][0], droll)),
@@ -213,6 +218,8 @@ class iCubHandsEnv():
 
                 new_quat_orn = p.getQuaternionFromEuler(new_eu_orn)
 
+            elif len(action) == 7:
+                new_quat_orn = action[3:7]
             else:
                 new_quat_orn = p.getLinkState(self.robot_id, self._end_eff_idx)[5]
 

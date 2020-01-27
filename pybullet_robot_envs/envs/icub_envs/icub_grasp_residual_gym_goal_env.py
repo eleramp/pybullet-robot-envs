@@ -110,7 +110,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         # Configure action space
         action_dim = self._robot.get_action_dim()
-        action_bound = 0.005
+        action_bound = 1
         action_high = np.array([action_bound] * action_dim)
         action_space = spaces.Box(-action_high, action_high, dtype='float32')
 
