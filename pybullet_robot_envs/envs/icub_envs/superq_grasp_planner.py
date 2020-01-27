@@ -140,13 +140,11 @@ class SuperqGraspPlanner:
         counter = 1
         rnd = 0
         for i, v in enumerate(obj_mesh.vertices):
-            #if i%20 > 0:
-            #    continue
             v0 = v * obj_scale
             v1 = collision_dcm.dot(v0) + collision_pose
             v2 = w_robot_R_obj.dot(v1)
             sph_vec = sph_coord(v2[0], v2[1], v2[2])
-
+            # sample only points visible to the robot eyes, to simulate partial observability of the object
             if sph_vec[1] <= m.pi/6 or -m.pi/2 <= sph_vec[2] <= m.pi/2:
                 v3 = v2 + w_robot_T_obj[0]
 
@@ -178,7 +176,7 @@ class SuperqGraspPlanner:
     def estimate_superq(self):
         # Check point cloud validity
         if self._pointcloud.getNumberPoints() < cfg.sq_model['minimum_points']:
-            print("current object point cloud has only {} points. Please re-call compute_object_pointcloud()."
+            print("current object's point cloud has only {} points. Please re-call compute_object_pointcloud()."
                   .format(self._pointcloud.getNumberPoints() ))
             return superquadric_bindings.vector_superquadric(np.size(self._superqs, 0))
 
@@ -233,7 +231,7 @@ class SuperqGraspPlanner:
         elif self._grasping_hand is 'l' and self._render:
             self._visualizer.highlightBestPose("left", "left", grasp_res_hand.best_pose)
 
-        # transform grasp pose from icub world to pybullet world coordinates
+        # ------> transform grasp pose from icub world to pybullet world coordinates <-------- #
         # axis angle to quaterion
         quat_gp_icub = axis_angle_to_quaternion((best_grasp_pose.axisangle[0][0], best_grasp_pose.axisangle[1][0],
                                             best_grasp_pose.axisangle[2][0], best_grasp_pose.axisangle[3][0]))
@@ -283,53 +281,41 @@ class SuperqGraspPlanner:
         # reset current path
         self._approach_path = []
 
-        if self._grasping_hand is 'r':
-            gp_URDF_link = p.multiplyTransforms(self._best_grasp_pose[:3], p.getQuaternionFromEuler(self._best_grasp_pose[3:6]),
-                                                  (0.064668, -0.0056, -0.022681),
-                                                  p.getQuaternionFromEuler((0, 0, 0)))
-            sp_URDF_link = p.multiplyTransforms(self._starting_pose[:3],
-                                                p.getQuaternionFromEuler(self._starting_pose[3:6]),
-                                                (0.064668, -0.0056, -0.022681),
-                                                p.getQuaternionFromEuler((0, 0, 0)))
-        else:
-            gp_URDF_link = p.multiplyTransforms(self._best_grasp_pose[:3], p.getQuaternionFromEuler(self._best_grasp_pose[3:6]),
-                                                  (-0.064768, -0.00563, -0.02266),
-                                                  p.getQuaternionFromEuler((0, 0, 0)))
-            sp_URDF_link = p.multiplyTransforms(self._starting_pose[:3],
-                                                p.getQuaternionFromEuler(self._starting_pose[3:6]),
-                                                (-0.064768, -0.00563, -0.02266),
-                                                p.getQuaternionFromEuler((0, 0, 0)))
-
         # linear path from initial to grasping pose
         n_pt = 10
         i_path = [i/n_pt for i in range(0, n_pt+1, 2)]
-        delta_pos = np.subtract(self._best_grasp_pose[:3], self._starting_pose[:3])  # np.subtract(gp_URDF_link[0], sp_URDF_link[0])
+        delta_pos = np.subtract(self._best_grasp_pose[:3], self._starting_pose[:3])
 
         # quaternion of starting pose
-        q_sp = p.getQuaternionFromEuler(self._starting_pose[3:6])  # sp_URDF_link[1]
+        q_sp = p.getQuaternionFromEuler(self._starting_pose[3:6])
         w_q_sp = np.quaternion(q_sp[3], q_sp[0], q_sp[1], q_sp[2])
 
         # quaternion of grasping (target) pose
-        q_gp = p.getQuaternionFromEuler(self._best_grasp_pose[3:6])  # gp_URDF_link[1]
+        q_gp = p.getQuaternionFromEuler(self._best_grasp_pose[3:6])
         w_q_gp = np.quaternion(q_gp[3], q_gp[0], q_gp[1], q_gp[2])
+
+        # relative quaternion from starting to grasping pose
+        sp_q_gp = np.conj(w_q_sp) * w_q_gp
 
         for idx in i_path:
             # --- Position --- #
-            next_pos = np.add(self._starting_pose[:3], idx * delta_pos) # np.add(sp_URDF_link[0], idx * delta_pos)
+
+            next_pos = np.add(self._starting_pose[:3], idx * delta_pos)
             # print(" target pose: {} \n next pose: {} ".format(gp_URDF_link_frame[0], next_pos))
 
             # --- Orientation --- #
-            # relative quaternion from starting to grasping pose
-            sp_q_gp = np.conj(w_q_sp) * w_q_gp
-            sp_ax_gp = quaternion.as_rotation_vector(sp_q_gp)
+            # TO DO: gestisci meglio quaternion-axis angle (scegli una libreria:se numpy o tue funzioni)
 
-            sp_ax_gp[0] = idx * sp_ax_gp[0]
-            next_orn = quaternion.as_float_array(w_q_sp * quaternion.from_rotation_vector(sp_ax_gp))
+            delta_quat = quaternion.as_float_array(sp_q_gp)
+            delta_ax = quaternion_to_axis_angle([delta_quat[1], delta_quat[2], delta_quat[3], delta_quat[0]])
+            delta_ax[-1] = idx * delta_ax[-1]
+            delta_quat = axis_angle_to_quaternion(delta_ax)
 
-            next_eu = p.getEulerFromQuaternion([next_orn[1], next_orn[2], next_orn[3], next_orn[0]])
-            print(" target eu: {} \n next eu: {} ".format(self._starting_pose[3:6], next_eu))
+            next_orn = quaternion.as_float_array(w_q_sp * np.quaternion(delta_quat[3], delta_quat[0], delta_quat[1], delta_quat[2]))
 
-            self._approach_path.append([next_pos.tolist(), list(next_eu)])
+            # next_eu = p.getEulerFromQuaternion([next_orn[1], next_orn[2], next_orn[3], next_orn[0]])
+
+            self._approach_path.append([next_pos.tolist(), (next_orn[1], next_orn[2], next_orn[3], next_orn[0])])
 
         self._debug_gui(self._approach_path)
 
