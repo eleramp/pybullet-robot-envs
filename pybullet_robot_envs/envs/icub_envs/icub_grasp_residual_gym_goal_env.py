@@ -177,7 +177,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         else:
             # relative obj position wrt grasping pose
             world_obs = self._world.get_observation()
-            inv_gp_pose = p.invertTransform(gp[:3], p.getQuaternionFromEuler(gp[3:6]))
+            inv_gp_pose = p.invertTransform(world_obs[:3], p.getQuaternionFromEuler(world_obs[3:6]))
             obj_pos_in_gp, obj_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
                                                                 world_obs[:3], p.getQuaternionFromEuler(world_obs[3:6]))
             obj_eu_in_gp = p.getEulerFromQuaternion(obj_orn_in_gp)
