@@ -282,40 +282,28 @@ class SuperqGraspPlanner:
         self._approach_path = []
 
         # linear path from initial to grasping pose
-        n_pt = 10
-        i_path = [i/n_pt for i in range(0, n_pt+1, 2)]
-        delta_pos = np.subtract(self._best_grasp_pose[:3], self._starting_pose[:3])
+        dist_object = 0.2
+        dist_intra_path_points = 0.02
+        n_pt = int(dist_object / dist_intra_path_points)
+        i_path = [i/n_pt for i in range(1, n_pt+1)]
 
-        # quaternion of starting pose
-        q_sp = p.getQuaternionFromEuler(self._starting_pose[3:6])
-        w_q_sp = np.quaternion(q_sp[3], q_sp[0], q_sp[1], q_sp[2])
-
-        # quaternion of grasping (target) pose
-        q_gp = p.getQuaternionFromEuler(self._best_grasp_pose[3:6])
-        w_q_gp = np.quaternion(q_gp[3], q_gp[0], q_gp[1], q_gp[2])
-
-        # relative quaternion from starting to grasping pose
-        sp_q_gp = np.conj(w_q_sp) * w_q_gp
+        sp_inv_pose = p.invertTransform(self._starting_pose[:3], p.getQuaternionFromEuler(self._starting_pose[3:6]))
+        sp_P_gp = p.multiplyTransforms(sp_inv_pose[0], sp_inv_pose[1],
+                                       self._best_grasp_pose[:3], p.getQuaternionFromEuler(self._best_grasp_pose[3:6]))
 
         for idx in i_path:
             # --- Position --- #
-
-            next_pos = np.add(self._starting_pose[:3], idx * delta_pos)
-            # print(" target pose: {} \n next pose: {} ".format(gp_URDF_link_frame[0], next_pos))
+            delta_pos = idx * np.array(sp_P_gp[0])
 
             # --- Orientation --- #
-            # TO DO: gestisci meglio quaternion-axis angle (scegli una libreria:se numpy o tue funzioni)
-
-            delta_quat = quaternion.as_float_array(sp_q_gp)
-            delta_ax = quaternion_to_axis_angle([delta_quat[1], delta_quat[2], delta_quat[3], delta_quat[0]])
+            delta_ax = quaternion_to_axis_angle(sp_P_gp[1])
             delta_ax[-1] = idx * delta_ax[-1]
             delta_quat = axis_angle_to_quaternion(delta_ax)
 
-            next_orn = quaternion.as_float_array(w_q_sp * np.quaternion(delta_quat[3], delta_quat[0], delta_quat[1], delta_quat[2]))
+            next_pose = p.multiplyTransforms(self._starting_pose[:3], p.getQuaternionFromEuler(self._starting_pose[3:6]),
+                                            delta_pos, delta_quat)
 
-            # next_eu = p.getEulerFromQuaternion([next_orn[1], next_orn[2], next_orn[3], next_orn[0]])
-
-            self._approach_path.append([next_pos.tolist(), (next_orn[1], next_orn[2], next_orn[3], next_orn[0])])
+            self._approach_path.append(next_pose)
 
         self._debug_gui(self._approach_path)
 
