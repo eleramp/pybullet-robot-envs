@@ -89,6 +89,13 @@ class WorldFetchEnv:
     def set_obj_pose(self, new_pos, new_quat):
         p.resetBasePositionAndOrientation(self.obj_id, new_pos, new_quat)
 
+    def check_contact(self, link_id):
+        pts = p.getClosestPoints(self.obj_id, link_id, distance=0.01)
+        if len(pts) > 0:
+            print("<<----------->> contact with object!!!!! <<----------------->>")
+            return True
+        return False
+
     def seed(self, seed=None):
         np.random.seed(seed)
 
@@ -106,7 +113,7 @@ class WorldFetchEnv:
         px = x_min + 0.5 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.6 * (self._ws_lim[1][1] - self._ws_lim[1][0])
         pz = self._h_table+0.07
-        quat = p.getQuaternionFromEuler([0.0, 0.0, 0])
+        quat = p.getQuaternionFromEuler([0.0, 0.0, 3/4*m.pi])
 
         if self._obj_pose_rnd_std > 0:
             # Add a Gaussian noise to position
