@@ -23,7 +23,7 @@ import numpy as np
 
 def main(args):
 
-    env = iCubGraspResidualGymGoalEnv( renders=True, control_arm='r', obj_pose_rnd_std=0.05,  noise_pcl=0.00)
+    env = iCubGraspResidualGymGoalEnv( renders=True, control_arm='r', obj_pose_rnd_std=0.0,  noise_pcl=0.00)
     env.seed(1)
     motorsIds = []
 

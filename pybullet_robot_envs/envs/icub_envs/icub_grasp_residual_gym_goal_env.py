@@ -22,20 +22,20 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
                 'video.frames_per_second': 50}
 
     def __init__(self,
-                 actionRepeat=30,
+                 action_repeat=30,
                  control_arm='l',
                  control_orientation=1,
                  obj_name=get_ycb_objects_list()[0],
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
                  renders=False,
-                 max_steps=3000, use_superq=0):
+                 max_steps=1000, use_superq=0):
 
         self._time_step = 1. / 240.  # 4 ms
 
         self._control_arm = control_arm
         self._control_orientation = control_orientation
-        self._action_repeat = actionRepeat
+        self._action_repeat = action_repeat
         self._observation = []
         self.goal = np.zeros(3)
 
@@ -47,7 +47,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._obj_pose_rnd_std = obj_pose_rnd_std
         self._noise_pcl = noise_pcl
         self._last_frame_time = 0
-        self._distance_threshold = 0.05
+        self._distance_threshold = 0.09
         self._use_superq = use_superq
 
         # Initialize PyBullet simulator
@@ -145,14 +145,21 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
 
         self.compute_grasp_pose()
+        self._base_controller.compute_approach_path()
 
         self.debug_gui()
+        p.stepSimulation()
+
+        robot_obs, _ = self._robot.get_observation()
+        world_obs, _ = self._world.get_observation()
+
+        # move hand to the first way point on approach trajectory
+        base_action = self._base_controller.get_next_action(robot_obs, world_obs)
+        self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
+
         # Let the world run for a bit
         for _ in range(100):
             p.stepSimulation()
-
-        if self._renders:
-            self._base_controller._visualizer.render()
 
         self._t_grasp, self._t_lift = 0, 0
 
@@ -205,8 +212,6 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
             print("can't compute any grasp pose")
             return
 
-        self._base_controller.compute_approach_path()
-
         self._superqs = self._base_controller.get_superqs()
         self._grasp_pose = self._base_controller.get_grasp_pose()
 
@@ -222,7 +227,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
     def get_goal_observation(self):
         obs, _ = self.get_extended_observation()
 
-        obj_pos_in_hand = obs[-6:-3]
+        obj_pos_in_hand = obs[-6:]
 
         return {
             'observation': obs.copy(),
@@ -259,8 +264,13 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         # cost: object falls
         if self._object_fallen(w_obs[3], w_obs[4]):
-            return np.float32(-1.0)
+            return np.float32(-100.0)
 
         # Compute distance between goal and the achieved goal.
         d = goal_distance(achieved_goal[:3], goal[:3])
+
+        # cost: object falls
+        if d >= 0.1 and self._world.check_contact(self._robot.robot_id):
+            return np.float32(-10.0)
+
         return -(d > self._distance_threshold).astype(np.float32)

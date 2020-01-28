@@ -23,21 +23,21 @@ class iCubGraspResidualGymEnv(gym.Env):
     'video.frames_per_second': 50}
 
     def __init__(self,
-                 actionRepeat=30,
+                 action_repeat=30,
                  control_arm='l',
                  control_orientation=1,
                  obj_name=get_ycb_objects_list()[0],
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
                  renders=False,
-                 max_steps=3000,
+                 max_steps=1000,
                  use_superq=1):
 
         self._time_step = 1. / 240.  # 4 ms
 
         self._control_arm = control_arm
         self._control_orientation = control_orientation
-        self._action_repeat = actionRepeat
+        self._action_repeat = action_repeat
         self._observation = []
 
         self._env_step_counter = 0
@@ -255,11 +255,11 @@ class iCubGraspResidualGymEnv(gym.Env):
                 time.sleep(time_to_sleep)
 
         # set new action
-        action = np.clip(action, self.action_space.low, self.action_space.high)
+        action = 1.5*np.clip(action, self.action_space.low, self.action_space.high)
+        action[:3] = np.clip(action[:3], -0.1, 0.1)
         pos_action = action[:3]
         eu_action = action[3:6]
         quat_action = p.getQuaternionFromEuler(eu_action)
-
 
         # get action from base controller
         robot_obs, _ = self._robot.get_observation()
