@@ -29,7 +29,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
                  renders=False,
-                 max_steps=1000, use_superq=0):
+                 max_steps=1000, use_superq=1):
 
         self._time_step = 1. / 240.  # 4 ms
 
@@ -37,7 +37,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._control_orientation = control_orientation
         self._action_repeat = action_repeat
         self._observation = []
-        self.goal = np.zeros(3)
+        self.goal = np.zeros(6)
 
         self._env_step_counter = 0
         self._renders = renders
@@ -99,13 +99,13 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
             observation_high.extend([el[1]])
 
         # Configure the observation space
-        observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
+        #observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
 
         # Configure the observation space
         observation_space = spaces.Dict(dict(
-            desired_goal=spaces.Box(-np.inf, np.inf, shape=goal_obs['achieved_goal'].shape, dtype='float32'),
+            desired_goal=spaces.Box(-np.inf, np.inf, shape=goal_obs['desired_goal'].shape, dtype='float32'),
             achieved_goal=spaces.Box(-np.inf, np.inf, shape=goal_obs['achieved_goal'].shape, dtype='float32'),
-            observation=observation_space,
+            observation=spaces.Box(-np.inf, np.inf, shape=goal_obs['observation'].shape, dtype='float32'),
         ))
 
         # Configure action space
@@ -161,6 +161,9 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         for _ in range(100):
             p.stepSimulation()
 
+        # compute goal
+        self.goal = self._compute_goal()
+
         self._t_grasp, self._t_lift = 0, 0
 
         obs = self.get_goal_observation()
@@ -180,7 +183,8 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
                                                               sq_pos, p.getQuaternionFromEuler(sq_eu))
             sq_eu_in_gp = p.getEulerFromQuaternion(sq_orn_in_gp)
 
-            return np.array(sq_pos_in_gp + sq_eu_in_gp)
+            return np.array(list(sq_pos_in_gp) + list(sq_eu_in_gp))
+
         else:
             # relative obj position wrt grasping pose
             world_obs = self._world.get_observation()
@@ -189,7 +193,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
                                                                 world_obs[:3], p.getQuaternionFromEuler(world_obs[3:6]))
             obj_eu_in_gp = p.getEulerFromQuaternion(obj_orn_in_gp)
 
-            return np.array(obj_pos_in_gp + obj_eu_in_gp)
+            return np.array(list(obj_pos_in_gp) + list(obj_eu_in_gp))
 
     def compute_grasp_pose(self):
 
