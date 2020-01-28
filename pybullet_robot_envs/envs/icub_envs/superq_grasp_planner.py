@@ -145,16 +145,17 @@ class SuperqGraspPlanner:
             v2 = w_robot_R_obj.dot(v1)
             sph_vec = sph_coord(v2[0], v2[1], v2[2])
             # sample only points visible to the robot eyes, to simulate partial observability of the object
-            if sph_vec[1] <= m.pi/6 or -m.pi/2 <= sph_vec[2] <= m.pi/2:
+            if sph_vec[1] <= m.pi/4 or -m.pi/2 <= sph_vec[2] <= m.pi/2:
                 v3 = v2 + w_robot_T_obj[0]
 
-                if rnd > 0 and counter > 0:
-                    counter -= 1
-                    v3 += noise[i]
+               # if np.random.random()<0.2:
+                #if rnd > 0 and counter > 0:
+                 #   counter -= 1
+                v3 += noise[i]
                     #continue
-                else:
-                    counter = 10000
-                    rnd = np.random.random() < 0.001
+                #else:
+                #    counter = 10000
+                #    rnd = np.random.random() < 0.01
 
                 points.push_back(v3)
                 colors.push_back([255, 255, 0])
@@ -281,17 +282,18 @@ class SuperqGraspPlanner:
         # reset current path
         self._approach_path = []
 
-        # linear path from initial to grasping pose
-        dist_object = 0.2
-        dist_intra_path_points = 0.02
-        n_pt = int(dist_object / dist_intra_path_points)
-        i_path = [i/n_pt for i in range(1, n_pt+1)]
-
+        # Transform from starting pose to grasp pose
         sp_inv_pose = p.invertTransform(self._starting_pose[:3], p.getQuaternionFromEuler(self._starting_pose[3:6]))
         sp_P_gp = p.multiplyTransforms(sp_inv_pose[0], sp_inv_pose[1],
                                        self._best_grasp_pose[:3], p.getQuaternionFromEuler(self._best_grasp_pose[3:6]))
 
-        for idx in i_path:
+        # linear path from initial to grasping pose
+        dist_object = np.linalg.norm(sp_P_gp[0])
+        dist_intra_path_points = 0.02
+        n_pt = int(dist_object / dist_intra_path_points)
+        i_path = [i / n_pt for i in range(0, n_pt + 1)]
+
+        for idx in i_path[-10:]:
             # --- Position --- #
             delta_pos = idx * np.array(sp_P_gp[0])
 
