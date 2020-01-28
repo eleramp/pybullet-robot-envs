@@ -6,34 +6,49 @@ register(
         id='iCubReach-v0',
         entry_point='pybullet_robot_envs.envs:iCubReachGymEnv',
         max_episode_steps=1000,
-        kwargs={ 'useIK':1, 'isDiscrete':0, 'control_arm':'l', 'useOrientation':0, 'rnd_obj_pose':1, 'maxSteps':1000},
+        kwargs={ 'useIK': 1,
+                 'isDiscrete': 0,
+                 'control_arm': 'l',
+                 'control_orientation': 0,
+                 'rnd_obj_pose': 1,
+                 'max_steps': 1000},
 )
 
 register(
         id='iCubPush-v0',
         entry_point='pybullet_robot_envs.envs:iCubPushGymEnv',
         max_episode_steps=1000,
-        kwargs={'useIK':1, 'isDiscrete':0, 'control_arm':'l', 'useOrientation':1, 'rnd_obj_pose':0.05, 'maxSteps':1000, 'reward_type':0},
-)
-
-register(
-        id='iCubGraspResidual-v0',
-        entry_point='pybullet_robot_envs.envs:iCubGraspResidualGymEnv',
-        max_episode_steps=1000,
-        kwargs={'control_arm': 'l',
-                'useOrientation': 1,
-                'rnd_obj_pose': 0.05,
-                'noise_pcl': 0.01,
-                'maxSteps': 3000,
-                'renders': False,
-                'terminal_failure': True},
+        kwargs={'useIK': 1,
+                'discrete_action': 0,
+                'control_arm': 'l',
+                'control_orientation': 1,
+                'obj_pose_rnd_std': 0.05,
+                'max_steps': 1000,
+                'reward_type': 0},
 )
 
 register(
         id='iCubPushGoal-v0',
         entry_point='pybullet_robot_envs.envs:iCubPushGymGoalEnv',
         max_episode_steps=1000,
-        kwargs={ 'useIK':1, 'isDiscrete':0, 'control_arm':'l', 'useOrientation':1, 'rnd_obj_pose':0.05, 'maxSteps':1000},
+        kwargs={ 'useIK': 1,
+                 'discrete_action': 0,
+                 'control_arm': 'l',
+                 'control_orientation': 1,
+                 'obj_pose_rnd_std': 0.05,
+                 'max_steps': 1000},
+)
+
+register(
+        id='iCubGraspResidual-v0',
+        entry_point='pybullet_robot_envs.envs:iCubGraspResidualGymEnv',
+        max_episode_steps=1000,
+        kwargs={'control_arm': 'r',
+                'control_orientation': 1,
+                'obj_pose_rnd_std': 0.05,
+                'noise_pcl': 0.0,
+                'max_steps': 1000,
+                'renders': False},
 )
 
 register(
@@ -41,12 +56,11 @@ register(
         entry_point='pybullet_robot_envs.envs:iCubGraspResidualGymGoalEnv',
         max_episode_steps=1000,
         kwargs={'control_arm': 'r',
-                'useOrientation': 1,
-                'rnd_obj_pose': 0.05,
-                'noise_pcl': 0.005,
-                'maxSteps': 2000,
-                'renders': False,
-                'terminal_failure': True},
+                'control_orientation': 1,
+                'obj_pose_rnd_std': 0.05,
+                'noise_pcl': 0.0,
+                'max_steps': 1000,
+                'renders': False},
 )
 
 
@@ -55,11 +69,13 @@ register(
         entry_point='pybullet_robot_envs.envs:pandaReachGymEnv',
         max_episode_steps=1000,
         kwargs={
-                 'useIK':0,
-                 'isDiscrete':0,
-                 'actionRepeat':1,
-                 'renders':False,
-                 'numControlledJoints':7, 'fixedPositionObj':False, 'includeVelObs':True},
+                 'useIK': 0,
+                 'isDiscrete': 0,
+                 'actionRepeat': 1,
+                 'renders': False,
+                 'numControlledJoints': 7,
+                  'fixedPositionObj': False,
+                  'includeVelObs': True},
 )
 
 register(
@@ -67,11 +83,13 @@ register(
         entry_point='pybullet_robot_envs.envs:pandaPushGymEnv',
         max_episode_steps=1000,
         kwargs={
-                 'useIK':0,
-                 'isDiscrete':0,
-                 'actionRepeat':1,
-                 'renders':False,
-                 'numControlledJoints':7, 'fixedPositionObj':False, 'includeVelObs':True},
+                 'useIK': 0,
+                 'isDiscrete': 0,
+                 'actionRepeat': 1,
+                 'renders': False,
+                 'numControlledJoints': 7,
+                 'fixedPositionObj': False,
+                 'includeVelObs': True},
 )
 
 # --------------------------- #
