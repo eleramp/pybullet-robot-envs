@@ -4,6 +4,6 @@ matplotlib
 pandas
 ruamel.yaml
 tensorflow==1.14
-stable_baselines==2.7
+stable_baselines==2.9.0
 git+https://github.com/eleramp/ycb-objects-models-sim.git
 git+https://github.com/eleramp/icub-model-pybullet.git
