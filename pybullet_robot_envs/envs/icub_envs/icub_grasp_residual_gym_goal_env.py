@@ -16,15 +16,16 @@ from pybullet_robot_envs.envs.icub_envs.superq_grasp_planner import SuperqGraspP
 
 from pybullet_robot_envs.envs.utils import goal_distance
 
-
 class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
     metadata = {'render.modes': ['human', 'rgb_array'],
                 'video.frames_per_second': 50}
 
     def __init__(self,
+                 log_file=currentdir,
                  action_repeat=30,
                  control_arm='l',
                  control_orientation=1,
+                 control_eu_or_quat=0,
                  obj_name=get_ycb_objects_list()[0],
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
@@ -35,6 +36,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         self._control_arm = control_arm
         self._control_orientation = control_orientation
+        self._control_eu_or_quat = control_eu_or_quat
         self._action_repeat = action_repeat
         self._observation = []
         self.goal = np.zeros(6)
@@ -47,8 +49,18 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._obj_pose_rnd_std = obj_pose_rnd_std
         self._noise_pcl = noise_pcl
         self._last_frame_time = 0
-        self._distance_threshold = 0.09
+        self._distance_threshold = 0.05
         self._use_superq = use_superq
+
+        self._log_file = []
+        self._log_file_path = []
+        self._log_file_path.append(os.path.join(log_file, 'nominal.txt'))
+        self._log_file_path.append(os.path.join(log_file, 'learned.txt'))
+        self._log_file.append(open(self._log_file_path[0], "w+"))
+        self._log_file.append(open(self._log_file_path[1], "w+"))
+
+        self._log_file[0].close()
+        self._log_file[1].close()
 
         # Initialize PyBullet simulator
         self._p = p
@@ -62,11 +74,13 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         # Load robot
         self._robot = iCubHandsEnv(use_IK=1, control_arm=self._control_arm,
-                                   control_orientation=self._control_orientation)
+                                   control_orientation=self._control_orientation,
+                                   control_eu_or_quat=self._control_eu_or_quat)
 
         # Load world environment
         self._world = YcbWorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
-                                       workspace_lim=self._robot._workspace_lim)
+                                       workspace_lim=self._robot._workspace_lim,
+                                       control_eu_or_quat=self._control_eu_or_quat)
 
         # Load base controller
         self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id, render=self._renders,
@@ -99,13 +113,13 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
             observation_high.extend([el[1]])
 
         # Configure the observation space
-        #observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
+        obs_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
 
         # Configure the observation space
         observation_space = spaces.Dict(dict(
             desired_goal=spaces.Box(-np.inf, np.inf, shape=goal_obs['desired_goal'].shape, dtype='float32'),
             achieved_goal=spaces.Box(-np.inf, np.inf, shape=goal_obs['achieved_goal'].shape, dtype='float32'),
-            observation=spaces.Box(-np.inf, np.inf, shape=goal_obs['observation'].shape, dtype='float32'),
+            observation=spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32'),
         ))
 
         # Configure action space
@@ -118,6 +132,14 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
     def reset(self):
         self.terminated = 0
+
+        if not self._log_file[0].closed:
+            self._log_file[0].close()
+        self._log_file[0] = open(self._log_file_path[0], "a+")
+
+        if not self._log_file[1].closed:
+            self._log_file[1].close()
+        self._log_file[1] = open(self._log_file_path[1], "a+")
 
         p.resetSimulation()
         p.setPhysicsEngineParameter(numSolverIterations=150)
@@ -181,57 +203,38 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
             inv_gp_pose = p.invertTransform(gp[:3], p.getQuaternionFromEuler(gp[3:6]))
             sq_pos_in_gp, sq_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
                                                               sq_pos, p.getQuaternionFromEuler(sq_eu))
-            sq_eu_in_gp = p.getEulerFromQuaternion(sq_orn_in_gp)
+            if self._control_eu_or_quat is 0:
+                sq_eu_in_gp = p.getEulerFromQuaternion(sq_orn_in_gp)
+                return np.array(list(sq_pos_in_gp) + list(sq_eu_in_gp))
 
-            return np.array(list(sq_pos_in_gp) + list(sq_eu_in_gp))
+            return np.array(list(sq_pos_in_gp) + list(sq_orn_in_gp))
 
         else:
             # relative obj position wrt grasping pose
-            world_obs = self._world.get_observation()
-            inv_gp_pose = p.invertTransform(world_obs[:3], p.getQuaternionFromEuler(world_obs[3:6]))
+            world_obs, _ = self._world.get_observation()
+
+            if self._control_eu_or_quat is 0:
+                w_quat = p.getQuaternionFromEuler(world_obs[3:6])
+            else:
+                w_quat = world_obs[3:7]
+
+            inv_gp_pose = p.invertTransform(world_obs[:3], w_quat)
             obj_pos_in_gp, obj_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
-                                                                world_obs[:3], p.getQuaternionFromEuler(world_obs[3:6]))
-            obj_eu_in_gp = p.getEulerFromQuaternion(obj_orn_in_gp)
+                                                                world_obs[:3], w_quat)
 
-            return np.array(list(obj_pos_in_gp) + list(obj_eu_in_gp))
-
-    def compute_grasp_pose(self):
-
-        self._base_controller.set_object_info(self._world.get_object_shape_info())
-
-        # TO DO: add check on outputs!
-        world_obs, _ = self._world.get_observation()
-        ok = self._base_controller.compute_object_pointcloud(world_obs)
-        if not ok:
-            print("Can't get good point cloud of the object")
-            return
-
-        ok = self._base_controller.estimate_superq()
-        if not ok:
-            print("can't compute good superquadrics")
-            return
-
-        ok = self._base_controller.estimate_grasp()
-        if not ok:
-            print("can't compute any grasp pose")
-            return
-
-        self._superqs = self._base_controller.get_superqs()
-        self._grasp_pose = self._base_controller.get_grasp_pose()
-
-        print("object pose: {}".format(world_obs))
-        print("superq pose: {} {}".format(self._superqs[0].center, self._superqs[0].ea))
-        print("grasp pose: {}".format(self._grasp_pose))
-
-        if self._renders:
-            self._base_controller._visualizer.render()
-
-        return self._grasp_pose
+            if self._control_eu_or_quat is 0:
+                obj_eu_in_gp = p.getEulerFromQuaternion(obj_orn_in_gp)
+                return np.array(list(obj_pos_in_gp) + list(obj_eu_in_gp))
+            else:
+                return np.array(list(obj_pos_in_gp) + list(obj_orn_in_gp))
 
     def get_goal_observation(self):
         obs, _ = self.get_extended_observation()
 
-        obj_pos_in_hand = obs[-6:]
+        if self._control_eu_or_quat is 0:
+            obj_pos_in_hand = obs[-6:]
+        else:
+            obj_pos_in_hand = obs[-7:]
 
         return {
             'observation': obs.copy(),
@@ -260,14 +263,21 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
     def _is_success(self, achieved_goal, goal):
         # Compute distance between goal and the achieved goal.
         d = goal_distance(achieved_goal[:3], goal[:3])
+        if d <= self._distance_threshold:
+            print("SUCCESS")
         return d <= self._distance_threshold
 
     def compute_reward(self, achieved_goal, goal, info):
         r = np.float32(-1.0)
         w_obs, _ = self._world.get_observation()
 
+        if self._control_eu_or_quat is 1:
+            eu = p.getEulerFromQuaternion(w_obs[3:7])
+        else:
+            eu = w_obs[3:6]
+
         # cost: object falls
-        if self._object_fallen(w_obs[3], w_obs[4]):
+        if self._object_fallen(eu[0], eu[1]):
             return np.float32(-100.0)
 
         # Compute distance between goal and the achieved goal.

@@ -38,7 +38,8 @@ class YcbWorldFetchEnv(WorldFetchEnv):
     def __init__(self,
                  obj_name='YcbMustardBottle',
                  obj_pose_rnd_std=0.05,
-                 workspace_lim=None):
+                 workspace_lim=None,
+                 control_eu_or_quat=0):
 
         if workspace_lim is None:
             workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
@@ -50,6 +51,8 @@ class YcbWorldFetchEnv(WorldFetchEnv):
         self._obj_init_pose = []
 
         self.obj_id = []
+
+        self._control_eu_or_quat = control_eu_or_quat
 
         # initialize
         self.seed()

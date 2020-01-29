@@ -110,7 +110,7 @@ class SuperqGraspPlanner:
 
         # Current object link pose wrt pybullet world frame
         obj_pos = obj_pose[:3]
-        obj_orn = obj_pose[3:6]
+        obj_quat = obj_pose[3:7]
 
         # Object collision shape info
         obj_scale = self._obj_info[3]
@@ -122,7 +122,7 @@ class SuperqGraspPlanner:
 
         # trasform object pose from pybullet world to icub world (on the hip)
         w_robot_T_w_py = p.invertTransform(self._robot_base_pose[0], self._robot_base_pose[1])
-        w_robot_T_obj = p.multiplyTransforms(w_robot_T_w_py[0], w_robot_T_w_py[1], obj_pos, p.getQuaternionFromEuler(obj_orn))
+        w_robot_T_obj = p.multiplyTransforms(w_robot_T_w_py[0], w_robot_T_w_py[1], obj_pos, obj_quat)
 
         # object transform matrix
         obj_matrix = p.getMatrixFromQuaternion(w_robot_T_obj[1])
@@ -204,11 +204,11 @@ class SuperqGraspPlanner:
         # ------> Compute candidate grasping poses <-------- #
         sq = superquadric_bindings.vector_superquadric(np.size(self._superqs, 0))
         for i, s in enumerate(self._superqs):
-           sq[i] = s
+            sq[i] = s
 
         grasp_res_hand = self._grasp_estimator.computeGraspPoses(sq)
 
-        if np.size(grasp_res_hand.grasp_poses,0) is 0:
+        if np.size(grasp_res_hand.grasp_poses, 0) is 0:
             return False
 
         # visualize them

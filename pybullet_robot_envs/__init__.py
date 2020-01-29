@@ -58,10 +58,12 @@ register(
         max_episode_steps=1000,
         kwargs={'control_arm': 'r',
                 'control_orientation': 1,
+                'control_eu_or_quat': 0,
                 'obj_pose_rnd_std': 0.05,
                 'noise_pcl': 0.0,
                 'max_steps': 1000,
-                'renders': False},
+                'renders': False,
+                'log_file': '/home/erampone/workspace/phd'},
 )
 
 

@@ -24,7 +24,8 @@ class WorldFetchEnv:
     def __init__(self,
                  obj_name='duck_vhacd',
                  obj_pose_rnd_std=0.05,
-                 workspace_lim=None):
+                 workspace_lim=None,
+                 control_eu_or_quat=0):
 
         if workspace_lim is None:
             workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
@@ -36,6 +37,8 @@ class WorldFetchEnv:
         self._obj_init_pose = []
 
         self.obj_id = []
+
+        self._control_eu_or_quat = control_eu_or_quat
 
         # initialize
         self.seed()
@@ -77,13 +80,17 @@ class WorldFetchEnv:
 
         # get object position
         obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id)
-        obj_euler = p.getEulerFromQuaternion(obj_orn)  # roll, pitch, yaw
-
         observation.extend(list(obj_pos))
-        observation.extend(list(obj_euler))
-
         observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
-        observation_lim.extend([[0, 2*m.pi], [0, 2*m.pi], [0, 2*m.pi]])
+
+        if self._control_eu_or_quat is 0:
+            obj_euler = p.getEulerFromQuaternion(obj_orn)  # roll, pitch, yaw
+            observation.extend(list(obj_euler))
+            observation_lim.extend([[0, 2*m.pi], [0, 2*m.pi], [0, 2*m.pi]])
+        else:
+            observation.extend(list(obj_orn))
+            observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+
         return observation, observation_lim
 
     def set_obj_pose(self, new_pos, new_quat):

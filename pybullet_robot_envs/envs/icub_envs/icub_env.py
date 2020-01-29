@@ -18,10 +18,11 @@ import math as m
 
 class iCubEnv:
 
-    def __init__(self, use_IK=0, control_arm='l', control_orientation=0):
+    def __init__(self, use_IK=0, control_arm='l', control_orientation=0, control_eu_or_quat=0):
 
         self._use_IK = use_IK
         self._control_orientation = control_orientation
+        self._control_eu_or_quat = control_eu_or_quat
         self._use_simulation = 1
 
         self._indices_torso = range(12, 15)
@@ -83,7 +84,7 @@ class iCubEnv:
 
         # save indices of only the joints to control
         control_arm_indices = self._indices_left_arm if self._control_arm == 'l' else self._indices_right_arm
-        self._motor_idxs = [i for i in self._indices_torso] + [j for j in control_arm_indices]
+        self._motor_idxs = list(self._indices_torso) + list(control_arm_indices)
 
         self._end_eff_idx = self._indices_left_arm[-1] if self._control_arm == 'l' else self._indices_right_arm[-1]
 
@@ -133,12 +134,14 @@ class iCubEnv:
     def get_action_dim(self):
         if not self._use_IK:
             return len(self._motor_idxs)
-        if self._control_orientation:
+        if self._control_orientation and self._control_eu_or_quat is 0:
             return 6  # position x,y,z + roll/pitch/yaw of hand frame
+        elif self._control_orientation and self._control_eu_or_quat is 1:
+            return 7  # position x,y,z + quat of hand frame
         return 3  # position x,y,z
 
     def get_observation_dim(self):
-        return len(self.getObservation())
+        return len(self.get_observation())
 
     def get_observation(self):
         # Cartesian world pos/orn of left hand center of mass
@@ -147,17 +150,23 @@ class iCubEnv:
         state = p.getLinkState(self.robot_id, self._end_eff_idx, computeLinkVelocity=1)
         pos = state[0]
         orn = state[1]
-        euler = p.getEulerFromQuaternion(orn)
+
         vel_l = state[6]
         vel_a = state[7]
 
         observation.extend(list(pos))
-        observation.extend(list(euler))  # roll, pitch, yaw
+        observation_lim.extend(list(self._workspace_lim))
+
+        if self._control_eu_or_quat is 0:
+            euler = p.getEulerFromQuaternion(orn)
+            observation.extend(list(euler))  # roll, pitch, yaw
+            observation_lim.extend(list(self._eu_lim))
+        else:
+            observation.extend(list(orn))  # roll, pitch, yaw
+            observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+
         #observation.extend(list(vel_l))
         #observation.extend(list(vel_a))
-
-        observation_lim.extend(list(self._workspace_lim))
-        observation_lim.extend(list(self._eu_lim))
 
         joint_states = p.getJointStates(self.robot_id, self._motor_idxs)
         joint_poses = [x[0] for x in joint_states]
@@ -165,6 +174,14 @@ class iCubEnv:
         observation_lim.extend([[self.ll[i], self.ul[i]] for i in self._motor_idxs])
 
         return observation, observation_lim
+
+    def _com_to_link_hand_frame(self):
+        if self._control_arm is 'r':
+            com_T_link_hand = (0.064668, -0.0056, -0.022681)
+        else:
+            com_T_link_hand = (-0.064768, -0.00563, -0.02266)
+
+        return com_T_link_hand
 
     def apply_action(self, action):
         if self._use_IK:
@@ -174,6 +191,7 @@ class iCubEnv:
                                      '\n- 6: (dx,dy,dz,droll,dpitch,dyaw)'
                                      '\n- 7: (dx,dy,dz,qx,qy,qz,w)'
                                      '\ninstead it is: ', len(action))
+
             dx, dy, dz = action[:3]
 
             new_pos = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], dx)),
@@ -198,13 +216,10 @@ class iCubEnv:
                 new_quat_orn = p.getLinkState(self.robot_id, self._end_eff_idx)[5]
 
             # transform the new pose from COM coordinate to link coordinate
-            if self._control_arm is 'r':
-                COM_t0_link_hand_pos = (0.064668, -0.0056, -0.022681)
-            else:
-                COM_t0_link_hand_pos = (-0.064768, -0.00563, -0.02266)
+            com_T_link_hand = self._com_to_link_hand_frame()
 
             link_hand_pose = p.multiplyTransforms(new_pos, new_quat_orn,
-                                                  COM_t0_link_hand_pos, p.getQuaternionFromEuler((0, 0, 0)))
+                                                  com_T_link_hand, (0., 0., 0., 1.))
 
             # compute joint positions with IK
             jointPoses = p.calculateInverseKinematics(self.robot_id, self._end_eff_idx,
@@ -213,7 +228,7 @@ class iCubEnv:
                                                       jointRanges=self.jr, restPoses=self.rs)
 
             # workaround to block joints of not-controlled arm
-            joints_to_block = self._indices_left_arm if self._control_arm == 'r' else self._indices_right_arm
+            joints_to_block = list(self._indices_left_arm) if self._control_arm == 'r' else list(self._indices_right_arm)
 
             if self._use_simulation:
                 for i in range(self._num_joints):

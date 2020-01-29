@@ -22,19 +22,29 @@ import open3d as o3d
 import numpy as np
 
 def main(args):
-
-    env = iCubGraspResidualGymGoalEnv( renders=True, control_arm='r', obj_pose_rnd_std=0.0,  noise_pcl=0.00)
+    eu_or_quat = 1
+    env = iCubGraspResidualGymGoalEnv(renders=True, control_arm='r', obj_pose_rnd_std=0.0,  noise_pcl=0.00,
+                                      control_eu_or_quat=eu_or_quat)
     env.seed(1)
     motorsIds = []
 
     dv = 1
-    motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhPosZ", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dv, dv, 0.0))
-    # motorsIds.append(env._p.addUserDebugParameter("close_open", -dv, dv, 0.0))
+    if eu_or_quat is 0:
+        motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("lhPosZ", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dv, dv, 0.0))
+        # motorsIds.append(env._p.addUserDebugParameter("close_open", -dv, dv, 0.0))
+    else:
+        motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("lhPosZ", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("qx", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("qy", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("qz", -dv, dv, 0.0))
+        motorsIds.append(env._p.addUserDebugParameter("qw", -dv, dv, 0.0))
 
     done = False
     #env._p.addUserDebugText('current hand position', [0, -0.5, 1.4], [1.1, 0, 0])
