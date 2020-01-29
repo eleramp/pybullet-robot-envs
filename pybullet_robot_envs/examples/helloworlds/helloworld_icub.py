@@ -22,7 +22,7 @@ import numpy as np
 def main():
     # Open GUI and set pybullet_data in the path
     p.connect(p.GUI)
-    p.resetDebugVisualizerCamera(1.8, 140, -50, [0.0, -0.0, -0.0])
+    p.resetDebugVisualizerCamera(1.8, 120, -50, [0.0, -0.0, -0.0])
     p.resetSimulation()
     p.setPhysicsEngineParameter(numSolverIterations=150)
     p.setTimeStep(1/240.)
@@ -84,29 +84,40 @@ def main():
         p.stepSimulation()
 
     # pregrasp gesture of the right hand
-    p.setJointMotorControlArray(icubId, [50, 68], p.POSITION_CONTROL, targetPositions=[1.4, 1.57], forces=[50, 50])
+    p.setJointMotorControlArray(icubId, [50, 68], p.POSITION_CONTROL, targetPositions=[1, 1.57], forces=[50, 50])
     for _ in range(70):
         p.stepSimulation()
         time.sleep(0.02)
 
     # go above the object
-    pos_1 = [0.5, 0.0, 0.8]
+    pos_1 = [0.49, 0.0, 0.8]
+    quat_1 = p.getQuaternionFromEuler([0, 0, m.pi/2])
+    jointPoses = p.calculateInverseKinematics(icubId, hand_idx, pos_1, quat_1)
+    p.setJointMotorControlArray(icubId, jointIds, p.POSITION_CONTROL, targetPositions=jointPoses,
+                                forces=[50] * len(jointIds))
+    p.setJointMotorControl2(icubId, 50, p.POSITION_CONTROL, targetPosition=1, force=50)
+    for _ in range(100):
+        p.stepSimulation()
+        time.sleep(0.02)
+
+    # turn hand above the object
+    pos_1 = [0.485, 0.0, 0.75]
     quat_1 = p.getQuaternionFromEuler([0, m.pi/2, m.pi/2])
     jointPoses = p.calculateInverseKinematics(icubId, hand_idx, pos_1, quat_1)
     p.setJointMotorControlArray(icubId, jointIds, p.POSITION_CONTROL, targetPositions=jointPoses,
                                 forces=[50] * len(jointIds))
-    p.setJointMotorControl2(icubId, 50, p.POSITION_CONTROL, targetPosition=1.4, force=50)
+    p.setJointMotorControl2(icubId, 50, p.POSITION_CONTROL, targetPosition=1, force=50)
     for _ in range(100):
         p.stepSimulation()
         time.sleep(0.02)
 
     # go down to the object
-    pos_2 = [0.5, 0.0, 0.675 + 0.064]
+    pos_2 = [0.485, 0.0, 0.675 + 0.064]
     quat_2 = p.getQuaternionFromEuler([0, m.pi/2, m.pi/2])
     jointPoses = p.calculateInverseKinematics(icubId, hand_idx, pos_2, quat_2)
     p.setJointMotorControlArray(icubId, jointIds, p.POSITION_CONTROL, targetPositions=jointPoses,
                                 forces=[50] * len(jointIds))
-    p.setJointMotorControl2(icubId, 50, p.POSITION_CONTROL, targetPosition=1.4, force=50)
+    p.setJointMotorControl2(icubId, 50, p.POSITION_CONTROL, targetPosition=1, force=50)
     for _ in range(100):
         p.stepSimulation()
         time.sleep(0.02)
@@ -114,7 +125,7 @@ def main():
     # close fingers
     pos = [0, 0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 1.57, 0.6, 0.4, 0.7]
 
-    steps = [i/100 for i in range(0, 101, 1)]
+    steps = [i/50 for i in range(0, 51, 1)]
     for s in steps:
         next_pos = np.multiply(pos, s)
         p.setJointMotorControlArray(icubId, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
@@ -123,7 +134,7 @@ def main():
         for _ in range(5):
             p.stepSimulation()
 
-    # go up to the object
+    # go up
     pos_2 = [0.5, 0, 0.9]
     quat_2 = p.getQuaternionFromEuler([0, m.pi/2, m.pi/2])
     jointPoses = list(p.calculateInverseKinematics(icubId, hand_idx, pos_2, quat_2))
@@ -134,7 +145,7 @@ def main():
         p.stepSimulation()
         time.sleep(0.03)
 
-    # go up to the object
+    # go right
     pos_2 = [0.3, -0.2, 0.9]
     quat_2 = p.getQuaternionFromEuler([0, 0, m.pi/2])
     jointPoses = list(p.calculateInverseKinematics(icubId, hand_idx, pos_2, quat_2))
