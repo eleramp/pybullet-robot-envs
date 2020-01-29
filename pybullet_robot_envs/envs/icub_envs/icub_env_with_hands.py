@@ -16,12 +16,13 @@ import quaternion
 import math as m
 
 
-class iCubHandsEnv():
+class iCubHandsEnv(iCubEnv):
 
-    def __init__(self, use_IK=0, control_arm='l', control_orientation=0):
+    def __init__(self, use_IK=0, control_arm='l', control_orientation=0, control_eu_or_quat=0):
 
         self._use_IK = use_IK
         self._control_orientation = control_orientation
+        self._control_eu_or_quat = control_eu_or_quat
         self._use_simulation = 1
 
         self._indices_torso = range(12, 15)
@@ -131,191 +132,10 @@ class iCubHandsEnv():
         if self._use_IK:
             self.apply_action(self._home_hand_pose[:3])
 
-    def delete_simulated_robot(self):
-        # Remove the robot from the simulation
-        p.removeBody(self.robot_id)
-
-    def get_joint_ranges(self):
-        lower_limits, upper_limits, joint_ranges, rest_poses = [], [], [], []
-        for i in range(self._num_joints):
-            jointInfo = p.getJointInfo(self.robot_id, i)
-
-            if jointInfo[3] > -1:
-                ll, ul = jointInfo[8:10]
-                jr = ul - ll
-                # For simplicity, assume resting state == initial state
-                rp = p.getJointState(self.robot_id, i)[0]
-                lower_limits.append(ll)
-                upper_limits.append(ul)
-                joint_ranges.append(jr)
-                rest_poses.append(rp)
-
-        return lower_limits, upper_limits, joint_ranges, rest_poses
-
-    def get_ws_lim(self):
-        return self._workspace_lim
-
-    def get_action_dim(self):
-        if not self._use_IK:
-            return len(self._motor_idxs)
-        if self._control_orientation:
-            return 6  # position x,y,z + roll/pitch/yaw of hand frame
-        return 3  # position x,y,z
-
-    def get_observation_dim(self):
-        return len(self.getObservation())
-
-    def get_observation(self):
-        # Cartesian world pos/orn of left hand center of mass
-        observation = []
-        observation_lim = []
-        state = p.getLinkState(self.robot_id, self._end_eff_idx, computeLinkVelocity=1)
-        pos = state[0]
-        orn = state[1]
-        euler = p.getEulerFromQuaternion(orn)
-        vel_l = state[6]
-        vel_a = state[7]
-
-        observation.extend(list(pos))
-        observation.extend(list(euler))  # roll, pitch, yaw
-        #observation.extend(list(vel_l))
-        #observation.extend(list(vel_a))
-
-        observation_lim.extend(list(self._workspace_lim))
-        observation_lim.extend(list(self._eu_lim))
-
-        joint_states = p.getJointStates(self.robot_id, self._motor_idxs)
-        joint_poses = [x[0] for x in joint_states]
-        observation.extend(list(joint_poses))
-        observation_lim.extend([[self.ll[i], self.ul[i]] for i in self._motor_idxs])
-
-        return observation, observation_lim
-
-    def apply_action(self, action):
-        if self._use_IK:
-
-            if not (len(action) == 3 or len(action) == 6 or len(action) == 7):
-                raise AssertionError('number of action commands must be \n- 3: (dx,dy,dz)'
-                                     '\n- 6: (dx,dy,dz,droll,dpitch,dyaw)'
-                                     '\n- 7: (dx,dy,dz,qx,qy,qz,w)'
-                                     '\ninstead it is: ', len(action))
-
-            dx, dy, dz = action[:3]
-
-            new_pos = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], dx)),
-                       min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], dy)),
-                       min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], dz))]
-
-            if not self._control_orientation:
-                new_quat_orn = p.getQuaternionFromEuler(self._home_hand_pose[3:6])
-
-            elif len(action) == 6:
-                droll, dpitch, dyaw = action[3:6]
-
-                new_eu_orn = [min(self._eu_lim[0][1], max(self._eu_lim[0][0], droll)),
-                              min(self._eu_lim[1][1], max(self._eu_lim[1][0], dpitch)),
-                              min(self._eu_lim[2][1], max(self._eu_lim[2][0], dyaw))]
-
-                new_quat_orn = p.getQuaternionFromEuler(new_eu_orn)
-
-            elif len(action) == 7:
-                new_quat_orn = action[3:7]
-            else:
-                new_quat_orn = p.getLinkState(self.robot_id, self._end_eff_idx)[5]
-
-            # transform the new pose from COM coordinate to link coordinate
-            if self._control_arm is 'r':
-                COM_t0_link_hand_pos = (-0.011682, 0.051682, -0.000577)
-            else:
-                COM_t0_link_hand_pos = (-0.011682, 0.051355, 0.000577)
-
-            link_hand_pose = p.multiplyTransforms(new_pos, new_quat_orn,
-                                                  COM_t0_link_hand_pos, p.getQuaternionFromEuler((0, 0, 0)))
-
-            # compute joint positions with IK
-            jointPoses = p.calculateInverseKinematics(self.robot_id, self._end_eff_idx,
-                                                      link_hand_pose[0], link_hand_pose[1],
-                                                      lowerLimits=self.ll, upperLimits=self.ul,
-                                                      jointRanges=self.jr, restPoses=self.rs)
-
-            # workaround to block joints of not-controlled arm
-            joints_to_block = list(self._indices_left_hand) + list(self._indices_right_hand)
-            joints_to_block += list(self._indices_left_arm) if self._control_arm == 'r' else list(self._indices_right_arm)
-
-            if self._use_simulation:
-                for i in range(self._num_joints):
-                    if i in joints_to_block:
-                        continue
-
-                    jointInfo = p.getJointInfo(self.robot_id, i)
-                    if jointInfo[3] > -1:
-                        # minimize error is:
-                        # error = position_gain * (desired_position - actual_position) +
-                        #         velocity_gain * (desired_velocity - actual_velocity)
-
-                        p.setJointMotorControl2(bodyUniqueId=self.robot_id,
-                                                jointIndex=i,
-                                                controlMode=p.POSITION_CONTROL,
-                                                targetPosition=jointPoses[i],
-                                                force=50)
-            else:
-                # reset the joint state (ignoring all dynamics, not recommended to use during simulation)
-                for i in range(self._num_joints):
-                    if i in joints_to_block:
-                        continue
-                    p.resetJointState(self.robot_id, i, jointPoses[i])
-
+    def _com_to_link_hand_frame(self):
+        if self._control_arm is 'r':
+            com_T_link_hand = (-0.011682, 0.051682, -0.000577)
         else:
-            if not len(action) == len(self._motor_idxs):
-                raise AssertionError('number of motor commands differs from number of motor to control',
-                                     len(action), len(self._motor_idxs))
+            com_T_link_hand = (-0.011682, 0.051355, 0.000577)
 
-            for idx, val in enumerate(action):
-                motor = self._motor_idxs[idx]
-
-                # curr_motor_pos = p.getJointState(self.robot_id, motor)[0]
-                new_motor_pos = min(self.ul[motor], max(self.ll[motor], val))
-
-                p.setJointMotorControl2(self.robot_id,
-                                        motor,
-                                        p.POSITION_CONTROL,
-                                        targetPosition=new_motor_pos,
-                                        force=50)
-
-    def debug_gui(self):
-
-        ws = self._workspace_lim
-        p1 = [ws[0][0], ws[1][0], ws[2][0]]  # xmin,ymin
-        p2 = [ws[0][1], ws[1][0], ws[2][0]]  # xmax,ymin
-        p3 = [ws[0][1], ws[1][1], ws[2][0]]  # xmax,ymax
-        p4 = [ws[0][0], ws[1][1], ws[2][0]]  # xmin,ymax
-
-        p.addUserDebugLine(p1, p2, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0)
-        p.addUserDebugLine(p2, p3, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0)
-        p.addUserDebugLine(p3, p4, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0)
-        p.addUserDebugLine(p4, p1, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0)
-
-        p.addUserDebugLine([0, 0, 0], [0.3, 0, 0], [1, 0, 0], parentObjectUniqueId=self.robot_id, parentLinkIndex=-1)
-        p.addUserDebugLine([0, 0, 0], [0, 0.3, 0], [0, 1, 0], parentObjectUniqueId=self.robot_id, parentLinkIndex=-1)
-        p.addUserDebugLine([0, 0, 0], [0, 0, 0.3], [0, 0, 1], parentObjectUniqueId=self.robot_id, parentLinkIndex=-1)
-
-        p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_right_arm[-1])
-        p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_right_arm[-1])
-        p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_right_arm[-1])
-
-        p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_left_arm[-1])
-        p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_left_arm[-1])
-        p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_left_arm[-1])
-
-        p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_left_hand[-4])
-        p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_left_hand[-4])
-        p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._indices_left_hand[-4])
+        return com_T_link_hand
