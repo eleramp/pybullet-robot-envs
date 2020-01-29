@@ -86,7 +86,7 @@ class WorldFetchEnv:
         if self._control_eu_or_quat is 0:
             obj_euler = p.getEulerFromQuaternion(obj_orn)  # roll, pitch, yaw
             observation.extend(list(obj_euler))
-            observation_lim.extend([[0, 2*m.pi], [0, 2*m.pi], [0, 2*m.pi]])
+            observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
         else:
             observation.extend(list(obj_orn))
             observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])

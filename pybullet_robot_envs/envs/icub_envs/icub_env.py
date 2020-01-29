@@ -160,7 +160,7 @@ class iCubEnv:
         if self._control_eu_or_quat is 0:
             euler = p.getEulerFromQuaternion(orn)
             observation.extend(list(euler))  # roll, pitch, yaw
-            observation_lim.extend(list(self._eu_lim))
+            observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
         else:
             observation.extend(list(orn))  # roll, pitch, yaw
             observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])

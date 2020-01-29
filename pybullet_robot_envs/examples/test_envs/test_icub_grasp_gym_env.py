@@ -22,7 +22,7 @@ import open3d as o3d
 import numpy as np
 
 def main(args):
-    eu_or_quat = 1
+    eu_or_quat = 0
     env = iCubGraspResidualGymGoalEnv(renders=True, control_arm='r', obj_pose_rnd_std=0.0,  noise_pcl=0.00,
                                       control_eu_or_quat=eu_or_quat)
     env.seed(1)
@@ -47,9 +47,6 @@ def main(args):
         motorsIds.append(env._p.addUserDebugParameter("qw", -dv, dv, 0.0))
 
     done = False
-    #env._p.addUserDebugText('current hand position', [0, -0.5, 1.4], [1.1, 0, 0])
-    #idx = env._p.addUserDebugText(' ', [0, -0.5, 1.2], [1, 0, 0])
-
     for t in range(10000000):
         # env.render()
         action = [] #[0.0]*7
@@ -61,7 +58,6 @@ def main(args):
             env.reset()
         if t % 100 == 0:
             print("reward ", reward)
-            #env._p.addUserDebugText(' '.join(str(round(e, 2)) for e in state[:6]), [0, -0.5, 1.2], [1, 0, 0], replaceItemUniqueId=idx)
 
 
 if __name__ == '__main__':

@@ -235,7 +235,7 @@ class iCubGraspResidualGymEnv(gym.Env):
             #
             if self._control_eu_or_quat is 0:
                 self._observation.extend(list(sq_eu))
-                observation_lim.extend([[0, 2 * m.pi], [0, 2 * m.pi], [0, 2 * m.pi]])
+                observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
             else:
                 self._observation.extend(list(sq_quat))
                 observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
@@ -257,7 +257,7 @@ class iCubGraspResidualGymEnv(gym.Env):
             if self._control_eu_or_quat is 0:
                 sq_euler_in_hand = p.getEulerFromQuaternion(sq_orn_in_hand)
                 self._observation.extend(list(sq_euler_in_hand))
-                observation_lim.extend([[0, 2 * m.pi], [0, 2 * m.pi], [0, 2 * m.pi]])
+                observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
 
             else:
                 self._observation.extend(list(sq_orn_in_hand))
@@ -278,7 +278,7 @@ class iCubGraspResidualGymEnv(gym.Env):
             if self._control_eu_or_quat is 0:
                 obj_euler_in_hand = p.getEulerFromQuaternion(obj_orn_in_hand)
                 self._observation.extend(list(obj_euler_in_hand))
-                observation_lim.extend([[0, 2 * m.pi], [0, 2 * m.pi], [0, 2 * m.pi]])
+                observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
 
             else:
                 self._observation.extend(list(obj_orn_in_hand))
