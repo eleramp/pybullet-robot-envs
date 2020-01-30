@@ -126,9 +126,12 @@ class iCubGraspResidualGymEnv(gym.Env):
         p.setGravity(0, 0, -9.8)
 
         self._robot.reset()
+
         # Let the world run for a bit
         for _ in range(100):
             p.stepSimulation()
+
+        self._robot.pre_grasp()
 
         self._world.reset()
         # Let the world run for a bit
@@ -329,6 +332,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         for _ in range(self._action_repeat):
             p.stepSimulation()
+            time.sleep(self._time_step)
             if self._termination():
                 break
 
@@ -337,10 +341,12 @@ class iCubGraspResidualGymEnv(gym.Env):
         # dump data
         self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat_1]])
 
+        return final_action_pos.tolist() + final_action_quat_1 + base_action[2]
+
     def step(self, action):
 
         # apply action on the robot
-        self.apply_action(action)
+        applied_action = self.apply_action(action)
 
         obs, _ = self.get_extended_observation()
 

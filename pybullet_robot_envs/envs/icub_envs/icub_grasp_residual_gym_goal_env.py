@@ -27,10 +27,10 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
                  control_orientation=1,
                  control_eu_or_quat=0,
                  obj_name=get_ycb_objects_list()[0],
-                 obj_pose_rnd_std=0.05,
+                 obj_pose_rnd_std=0.0,
                  noise_pcl=0.00,
                  renders=False,
-                 max_steps=1000, use_superq=1):
+                 max_steps=2000, use_superq=1):
 
         self._time_step = 1. / 240.  # 4 ms
 
@@ -45,11 +45,12 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._renders = renders
         self._max_steps = max_steps
         self.terminated = 0
-        self._t_grasp, self._t_lift = 0, 0
+        self._t_grasp, self._t_grasp_target = 0, 2
+        self._grasp_done = False
         self._obj_pose_rnd_std = obj_pose_rnd_std
         self._noise_pcl = noise_pcl
         self._last_frame_time = 0
-        self._distance_threshold = 0.05
+        self._distance_threshold = 0.09
         self._use_superq = use_superq
 
         self._log_file = []
@@ -153,9 +154,11 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         for _ in range(100):
             p.stepSimulation()
 
+        self._robot.pre_grasp()
+
         self._world.reset()
         # Let the world run for a bit
-        for _ in range(100):
+        for _ in range(300):
             p.stepSimulation()
 
         self._robot.debug_gui()
@@ -186,65 +189,60 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         # compute goal
         self.goal = self._compute_goal()
 
-        self._t_grasp, self._t_lift = 0, 0
+        self._t_grasp = 0
+        self._grasp_done = False
 
         obs = self.get_goal_observation()
         return obs
 
     def _compute_goal(self):
+        # hand_pos, obj_pos, finger joints
+        gp = self._grasp_pose.copy()
+        world_obs, _ = self._world.get_observation()
 
-        if self._use_superq:
-            sq_pos = self._superqs[0].center.copy()
-            sq_eu = self._superqs[0].ea.copy()
-
-            gp = self._grasp_pose.copy()
-
-            # relative sq position wrt grasping pose
-            inv_gp_pose = p.invertTransform(gp[:3], p.getQuaternionFromEuler(gp[3:6]))
-            sq_pos_in_gp, sq_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
-                                                              sq_pos, p.getQuaternionFromEuler(sq_eu))
-            if self._control_eu_or_quat is 0:
-                sq_eu_in_gp = p.getEulerFromQuaternion(sq_orn_in_gp)
-                return np.array(list(sq_pos_in_gp) + list(sq_eu_in_gp))
-
-            return np.array(list(sq_pos_in_gp) + list(sq_orn_in_gp))
-
+        if self._control_eu_or_quat is 0:
+            return np.array(gp + world_obs[:6] + self._robot._grasp_pos)
         else:
-            # relative obj position wrt grasping pose
-            world_obs, _ = self._world.get_observation()
-
-            if self._control_eu_or_quat is 0:
-                w_quat = p.getQuaternionFromEuler(world_obs[3:6])
-            else:
-                w_quat = world_obs[3:7]
-
-            inv_gp_pose = p.invertTransform(world_obs[:3], w_quat)
-            obj_pos_in_gp, obj_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
-                                                                world_obs[:3], w_quat)
-
-            if self._control_eu_or_quat is 0:
-                obj_eu_in_gp = p.getEulerFromQuaternion(obj_orn_in_gp)
-                return np.array(list(obj_pos_in_gp) + list(obj_eu_in_gp))
-            else:
-                return np.array(list(obj_pos_in_gp) + list(obj_orn_in_gp))
+            return np.array(gp + world_obs[:7] + self._robot._grasp_pos)
 
     def get_goal_observation(self):
         obs, _ = self.get_extended_observation()
+        w_obs, _ = self._world.get_observation()
+        finger_joints = self._robot.get_finger_joints_poses()
 
         if self._control_eu_or_quat is 0:
-            obj_pos_in_hand = obs[-6:]
+            hand_pos = obs[:6]
+            obj_pos = w_obs[:6]
         else:
-            obj_pos_in_hand = obs[-7:]
+            hand_pos = obs[:7]
+            obj_pos = w_obs[:7]
 
         return {
             'observation': obs.copy(),
-            'achieved_goal': np.array(obj_pos_in_hand),
+            'achieved_goal': np.concatenate((hand_pos, np.array(obj_pos), np.array(finger_joints))),
             'desired_goal': self.goal.copy(),
         }
 
     def step(self, action):
         # apply action on the robot
-        self.apply_action(action)
+        applied_action = self.apply_action(action)
+
+        # grasp object
+        if not self._termination() and applied_action[2] < 0 and not self._grasp_done:
+            steps = [i / 100 for i in range(0, 101, 1)]
+            for i in steps:
+                self._robot.grasp(i)
+                for _ in range(5):
+                    p.stepSimulation()
+                    time.sleep(self._time_step)
+
+                obs = self.get_goal_observation()
+                if self._termination() or self._is_success(obs['achieved_goal'], self.goal):
+                    break
+
+            self._grasp_done = True
+            # if self._robot.checkContacts(self._world.obj_id) and d <= 0.09:
+            #    print("grasp success??")
 
         obs = self.get_goal_observation()
 
@@ -255,20 +253,17 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         done = self._termination() or info['is_success']
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
-        #print("reward")
-        #print(reward)
+        print("reward")
+        print(reward)
 
         return obs, np.array(reward), np.array(done), info
 
-    def _is_success(self, achieved_goal, goal):
-        # Compute distance between goal and the achieved goal.
-        d = goal_distance(achieved_goal[:3], goal[:3])
-        if d <= self._distance_threshold:
-            print("SUCCESS")
-        return d <= self._distance_threshold
+    def _termination(self):
+        if self._env_step_counter > self._max_steps:
+            print("MAX STEPS")
+            return np.float32(1.)
 
-    def compute_reward(self, achieved_goal, goal, info):
-        r = np.float32(-1.0)
+        # early termination if object falls
         w_obs, _ = self._world.get_observation()
 
         if self._control_eu_or_quat is 1:
@@ -278,13 +273,58 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         # cost: object falls
         if self._object_fallen(eu[0], eu[1]):
+            print("FALLEN")
+            return np.float32(1.)
+
+        # here check lift for termination
+        # if self._object_lifted(world_obs[2], world_obs[-1]) and self._t_lift >= 2:
+        #    print("SUCCESS")
+        #    return np.float32(1.)
+
+        return np.float32(0.)
+
+    def _is_success(self, achieved_goal, goal):
+        # Compute distance between goal and the achieved goal.
+        d_hands = goal_distance(achieved_goal[:3], goal[:3])
+        d_objs = goal_distance(achieved_goal[6:9], goal[6:9])
+        d_hand_obj = goal_distance(achieved_goal[:3], achieved_goal[6:9])
+        d_fingers = goal_distance(achieved_goal[-20:], goal[-20:])
+
+        ok = self._robot.checkContacts(self._world.obj_id) and \
+                d_hand_obj <= self._distance_threshold and \
+                d_hands <= self._distance_threshold and \
+                d_objs <= 0.08 and d_fingers <= 0.7
+
+        if ok:
+            print("grasp success??")
+
+        return ok
+
+    def compute_reward(self, achieved_goal, goal, info):
+        r = np.float32(-1.0)
+
+        if self._control_eu_or_quat is 1:
+            obj_eu = p.getEulerFromQuaternion(achieved_goal[9:13])
+        else:
+            obj_eu = achieved_goal[9:12]
+
+        # cost: object falls
+        if self._object_fallen(obj_eu[0], obj_eu[1]):
             return np.float32(-100.0)
 
         # Compute distance between goal and the achieved goal.
-        d = goal_distance(achieved_goal[:3], goal[:3])
-
-        # cost: object falls
-        if d >= 0.1 and self._world.check_contact(self._robot.robot_id):
+        d_hands = goal_distance(achieved_goal[:3], goal[:3])
+        d_objs = goal_distance(achieved_goal[6:9], goal[6:9])
+        d_hand_obj = goal_distance(achieved_goal[:3], achieved_goal[6:9])
+        d_fingers = goal_distance(achieved_goal[-20:], goal[-20:])
+        # cost: object-hand collision
+        if d_hand_obj >= 0.11 and self._world.check_contact(self._robot.robot_id):
             return np.float32(-10.0)
 
-        return -(d > self._distance_threshold).astype(np.float32)
+        r = -np.float32(d_hand_obj > self._distance_threshold or
+              d_hands > self._distance_threshold or
+              d_objs > 0.08 or
+              not self._robot.checkContacts(self._world.obj_id) or
+              d_fingers > 0.7)
+
+        return r
