@@ -145,12 +145,12 @@ class SuperqGraspPlanner:
             v2 = w_robot_R_obj.dot(v1)
             sph_vec = sph_coord(v2[0], v2[1], v2[2])
             # sample only points visible to the robot eyes, to simulate partial observability of the object
-            if sph_vec[1] <= m.pi/4 or -m.pi/2 <= sph_vec[2] <= m.pi/2:
+            if sph_vec[1] <= m.pi/6 or -m.pi/2 <= sph_vec[2] <= m.pi/2:
                 v3 = v2 + w_robot_T_obj[0]
 
-               # if np.random.random()<0.2:
-                #if rnd > 0 and counter > 0:
-                 #   counter -= 1
+                # if np.random.random()<0.2:
+                #   if rnd > 0 and counter > 0:
+                #       counter -= 1
                 v3 += noise[i]
                     #continue
                 #else:
@@ -159,9 +159,9 @@ class SuperqGraspPlanner:
 
                 points.push_back(v3)
                 colors.push_back([255, 255, 0])
-                # if i % 100 is 0:
+                #if i % 100 is 0:
                 #    p.addUserDebugLine(v3, [v3[0] + 0.001, v3[1], v3[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
-                #                       lifeTime=30, parentObjectUniqueId=0)
+                #                      lifeTime=300, parentObjectUniqueId=0)
 
         if points.size() >= cfg.sq_model['minimum_points']:
             self._pointcloud.setPoints(points)

@@ -57,7 +57,8 @@ class WorldFetchEnv:
         # Load object. Randomize its start position if requested
         self._obj_init_pose = self._sample_pose()
         self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), self._obj_name + ".urdf"),
-                                basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7])
+                                basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
+                                 flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL)
 
     def get_object_init_pose(self):
         pos = self._obj_init_pose[:3]
@@ -68,7 +69,9 @@ class WorldFetchEnv:
         return self._h_table
 
     def get_object_shape_info(self):
-        return p.getCollisionShapeData(self.obj_id, -1)[0]
+        info = list(p.getCollisionShapeData(self.obj_id, -1)[0])
+        info[4] = p.getVisualShapeData(self.obj_id, -1)[0][4]
+        return info
 
     def get_observation_dimension(self):
         obs, _ = self.get_observation()
