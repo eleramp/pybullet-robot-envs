@@ -123,7 +123,7 @@ class WorldFetchEnv:
         px = x_min + 0.5 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.6 * (self._ws_lim[1][1] - self._ws_lim[1][0])
         pz = self._h_table+0.07
-        quat = p.getQuaternionFromEuler([0.0, 0.0, 3/4*m.pi])
+        quat = p.getQuaternionFromEuler([0.0, 0.0, 2/3*m.pi])
 
         if self._obj_pose_rnd_std > 0:
             # Add a Gaussian noise to position

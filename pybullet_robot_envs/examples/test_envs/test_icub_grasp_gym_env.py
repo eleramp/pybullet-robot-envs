@@ -9,6 +9,7 @@ print(os.sys.path)
 
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_env import iCubGraspResidualGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_goal_env import iCubGraspResidualGymGoalEnv
+from pybullet_robot_envs.envs.icub_envs.icub_reach_residual_gym_goal_env import iCubReachResidualGymGoalEnv
 
 import argparse
 parser = argparse.ArgumentParser()
