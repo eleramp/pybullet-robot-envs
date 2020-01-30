@@ -125,11 +125,11 @@ def main():
     # close fingers
     pos = [0, 0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 1.57, 0.6, 0.4, 0.7]
 
-    steps = [i/50 for i in range(0, 51, 1)]
+    steps = [i/60 for i in range(0, 61, 1)]
     for s in steps:
         next_pos = np.multiply(pos, s)
         p.setJointMotorControlArray(icubId, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
-                                    forces=[20] * len(range(52, 72)))
+                                    forces=[50] * len(range(52, 72)))
         p.setJointMotorControlArray(icubId, [50, 68], p.POSITION_CONTROL, targetPositions=[0.5, 1.57], forces=[50, 50])
         for _ in range(5):
             p.stepSimulation()
@@ -164,10 +164,13 @@ def main():
         next_pos = np.multiply(pos, s)
         p.setJointMotorControlArray(icubId, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
                                     forces=[20] * len(range(52, 72)))
+        p.setJointMotorControlArray(icubId, [68], p.POSITION_CONTROL, targetPositions=[1.57],
+                                    forces=[50])
         for _ in range(4):
             p.stepSimulation()
 
     jointPoses[-20:] = [0]*20
+    jointPoses[68] = 1.57
 
     # reset joints to home position
     jointIds = []
