@@ -88,6 +88,8 @@ class iCubEnv:
 
         self._end_eff_idx = self._indices_left_arm[-1] if self._control_arm == 'l' else self._indices_right_arm[-1]
 
+        self._joints_to_block = list(self._indices_left_arm) if self._control_arm == 'r' else list(self._indices_right_arm)
+
         self._motor_names = []
         for i in self._indices_torso:
             jointInfo = p.getJointInfo(self.robot_id, i)
@@ -228,11 +230,11 @@ class iCubEnv:
                                                       jointRanges=self.jr, restPoses=self.rs)
 
             # workaround to block joints of not-controlled arm
-            joints_to_block = list(self._indices_left_arm) if self._control_arm == 'r' else list(self._indices_right_arm)
+
 
             if self._use_simulation:
                 for i in range(self._num_joints):
-                    if i in joints_to_block:
+                    if i in self._joints_to_block:
                         continue
 
                     jointInfo = p.getJointInfo(self.robot_id, i)
@@ -249,7 +251,7 @@ class iCubEnv:
             else:
                 # reset the joint state (ignoring all dynamics, not recommended to use during simulation)
                 for i in range(self._num_joints):
-                    if i in joints_to_block:
+                    if i in self._joints_to_block:
                         continue
                     p.resetJointState(self.robot_id, i, jointPoses[i])
 

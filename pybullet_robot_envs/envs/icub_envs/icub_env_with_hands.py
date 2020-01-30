@@ -14,6 +14,7 @@ from pybullet_robot_envs.envs.icub_envs.icub_env import iCubEnv
 import numpy as np
 import quaternion
 import math as m
+import time
 
 
 class iCubHandsEnv(iCubEnv):
@@ -40,12 +41,12 @@ class iCubHandsEnv(iCubEnv):
         self._home_right_arm = [-29.4, 40.0, 0, 70, 0, 0, 0]
 
         self._home_left_hand = [0] * len(self._indices_left_hand)
-        self._home_left_hand[-4] = 90.0
         self._home_right_hand = [0] * len(self._indices_right_hand)
-        self._home_right_hand[-4] = 90.0
 
         self._home_hand_pose = []
         self._home_motor_pose = []
+
+        self._grasp_pos = [0, 0.4, 0.35, 0.05, 0, 0.35, 0.4, 0.05, 0, 0.35, 0.4, 0.05, 0, 0.35, 0.4, 0.05, 1.57, 0.6, 0.1, 0.05]
 
         self._workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
         self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi, m.pi]]
@@ -105,6 +106,9 @@ class iCubHandsEnv(iCubEnv):
         self._motor_idxs = [i for i in self._indices_torso] + [j for j in control_arm_indices]
         self._end_eff_idx = self._indices_left_arm[-1] if self._control_arm == 'l' else self._indices_right_arm[-1]
 
+        self._joints_to_block = list(self._indices_left_arm) if self._control_arm == 'r' else list(self._indices_right_arm)
+        self._joints_to_block += list(self._indices_left_hand) + list(self._indices_right_hand)
+
         self._home_motor_pose = self._home_pos_torso + control_arm_poses
 
         self._motor_names = []
@@ -139,3 +143,58 @@ class iCubHandsEnv(iCubEnv):
             com_T_link_hand = (-0.011682, 0.051355, 0.000577)
 
         return com_T_link_hand
+
+    def get_finger_joints_poses(self):
+        joint_states = p.getJointStates(self.robot_id, self._motor_idxs[-20:])
+        joint_poses = [x[0] for x in joint_states]
+        return joint_poses
+
+    def open_hand(self):
+        # open fingers
+        pos = [0, 0.6, 0.5, 0.8, 0, 0.6, 0.5, 0.8, 0, 0.6, 0.5, 0.9, 0, 0.6, 0.5, 0.8, 1.57, 0.6, 0.4, 0.7]
+        pos = [0]*20
+
+        if self._control_arm is 'l':
+            idx_thumb = self._indices_left_hand[-4]
+        else:
+            idx_thumb = self._indices_right_hand[-4]
+
+        steps = [i / 100 for i in range(100, -1, -1)]
+        for s in steps:
+            next_pos = np.multiply(pos, s)
+            p.setJointMotorControlArray(self.robot_id, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
+                                        forces=[20] * len(range(52, 72)))
+            p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=50)
+            for _ in range(4):
+                p.stepSimulation()
+
+    def pre_grasp(self):
+        # move fingers to pre-grasp configuration
+        if self._control_arm is 'l':
+            idx = self._indices_left_hand[-4]
+        else:
+            idx = self._indices_right_hand[-4]
+
+        p.resetJointState(self.robot_id, idx, 1.57)
+        p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=1.57, force=50)
+        p.stepSimulation()
+
+    def grasp(self, step):
+        # close fingers
+        if self._control_arm is 'l':
+            idx_thumb = self._indices_left_hand[-4]
+        else:
+            idx_thumb = self._indices_right_hand[-4]
+
+        next_pos = np.multiply(self._grasp_pos, step)
+        p.setJointMotorControlArray(self.robot_id, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
+                                    forces=[50] * len(range(52, 72)))
+        p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=50)
+
+    def checkContacts(self, obj_id):
+        points = p.getContactPoints(self.robot_id, obj_id)
+        if len(points) > 1:
+            print("contacts! {}".format(len(points)))
+            return True
+
+        return False
