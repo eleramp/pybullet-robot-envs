@@ -31,11 +31,11 @@ register(
         id='iCubPushGoal-v0',
         entry_point='pybullet_robot_envs.envs:iCubPushGymGoalEnv',
         max_episode_steps=1000,
-        kwargs={ 'useIK': 1,
+        kwargs={ 'use_IK': 1,
                  'discrete_action': 0,
-                 'control_arm': 'l',
+                 'control_arm': 'r',
                  'control_orientation': 1,
-                 'obj_pose_rnd_std': 0.05,
+                 'obj_pose_rnd_std': 0.0,
                  'max_steps': 1000},
 )
 
@@ -55,6 +55,20 @@ register(
 register(
         id='iCubGraspResidualGoal-v0',
         entry_point='pybullet_robot_envs.envs:iCubGraspResidualGymGoalEnv',
+        max_episode_steps=1000,
+        kwargs={'control_arm': 'r',
+                'control_orientation': 1,
+                'control_eu_or_quat': 0,
+                'obj_pose_rnd_std': 0.05,
+                'noise_pcl': 0.0,
+                'max_steps': 1000,
+                'renders': False,
+                'log_file': '/home/erampone/workspace/phd'},
+)
+
+register(
+        id='iCubReachResidualGoal-v0',
+        entry_point='pybullet_robot_envs.envs:iCubReachResidualGymGoalEnv',
         max_episode_steps=1000,
         kwargs={'control_arm': 'r',
                 'control_orientation': 1,
