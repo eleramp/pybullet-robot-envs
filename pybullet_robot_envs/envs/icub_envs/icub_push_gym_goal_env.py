@@ -108,7 +108,8 @@ class iCubPushGymGoalEnv(gym.GoalEnv, iCubPushGymEnv):
         for _ in range(100):
             p.stepSimulation()
 
-        self._tg_pose = np.array(self._sample_pose())
+        world_obs, _ = self._world.get_observation()
+        self._tg_pose = np.array(self._sample_pose(world_obs[:3]))
 
         # Let the world run for a bit
         for _ in range(100):
@@ -184,7 +185,7 @@ class iCubPushGymGoalEnv(gym.GoalEnv, iCubPushGymEnv):
         }
 
         done = self._termination() or info['is_success']
-        reward = self._compute_reward(obs['achieved_goal'], self._tg_pose.copy(), info)
+        reward = self.compute_reward(obs['achieved_goal'], self._tg_pose.copy(), info)
 
         return obs, reward, done, info
 
@@ -200,7 +201,7 @@ class iCubPushGymGoalEnv(gym.GoalEnv, iCubPushGymEnv):
 
         return d <= self._target_dist_min
 
-    def _compute_reward(self, achieved_goal, goal, info):
+    def compute_reward(self, achieved_goal, goal, info):
         # Compute distance between goal and the achieved goal.
         d = goal_distance(achieved_goal[:3], goal[:3])
 
