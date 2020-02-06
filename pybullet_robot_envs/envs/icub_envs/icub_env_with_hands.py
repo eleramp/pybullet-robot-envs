@@ -177,7 +177,6 @@ class iCubHandsEnv(iCubEnv):
 
         p.resetJointState(self.robot_id, idx, 1.57)
         p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=1.57, force=50)
-        p.stepSimulation()
 
     def grasp(self, step):
         # close fingers
@@ -186,6 +185,11 @@ class iCubHandsEnv(iCubEnv):
         else:
             idx_thumb = self._indices_right_hand[-4]
 
+        joint_states = p.getJointStates(self.robot_id, self._motor_idxs[-20:])
+        joint_poses = [x[0] for x in joint_states]
+        p.setJointMotorControlArray(self.robot_id, self._motor_idxs[-20:], p.POSITION_CONTROL, targetPositions=joint_poses,
+                                    forces=[50] * len(self._motor_idxs[-20:]))
+
         next_pos = np.multiply(self._grasp_pos, step)
         p.setJointMotorControlArray(self.robot_id, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
                                     forces=[50] * len(range(52, 72)))
@@ -193,7 +197,7 @@ class iCubHandsEnv(iCubEnv):
 
     def checkContacts(self, obj_id):
         points = p.getContactPoints(self.robot_id, obj_id)
-        if len(points) > 1:
+        if len(points) > 0:
             print("contacts! {}".format(len(points)))
             return True
 
