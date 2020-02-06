@@ -100,7 +100,7 @@ class WorldFetchEnv:
         p.resetBasePositionAndOrientation(self.obj_id, new_pos, new_quat)
 
     def check_contact(self, link_id):
-        pts = p.getClosestPoints(self.obj_id, link_id, distance=0.01)
+        pts = p.getContactPoints(self.obj_id, link_id)
         if len(pts) > 0:
             print("<<----------->> contact with object!!!!! <<----------------->>")
             return True
@@ -115,14 +115,13 @@ class WorldFetchEnv:
         p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.obj_id)
 
     def _sample_pose(self):
-
         # ws_lim = self._ws_lim
         x_min = self._ws_lim[0][0] + 0.064668
         x_max = self._ws_lim[0][1] - 0.05
 
         px = x_min + 0.5 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.6 * (self._ws_lim[1][1] - self._ws_lim[1][0])
-        pz = self._h_table+0.07
+        pz = self._h_table+0.06
         quat = p.getQuaternionFromEuler([0.0, 0.0, 2/3*m.pi])
 
         if self._obj_pose_rnd_std > 0:
