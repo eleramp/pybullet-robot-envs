@@ -126,8 +126,9 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         # Configure action space
         action_dim = self._robot.get_action_dim()
         action_bound = 1
-        action_high = np.array([action_bound] * action_dim)
-        action_space = spaces.Box(-action_high, action_high, dtype='float32')
+        action_high = np.array([0.05, 0.05, 0.05, 0.785, 0.2, 1])
+        action_low = np.array([-0.05, -0.05, -0.05, -0.785, -0.2, -1])
+        action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
 
@@ -157,6 +158,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._robot.pre_grasp()
 
         self._world.reset()
+
         # Let the world run for a bit
         for _ in range(300):
             p.stepSimulation()
@@ -229,7 +231,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         # grasp object
         if not self._termination() and applied_action[2] < 0 and not self._grasp_done:
-            steps = [i / 100 for i in range(0, 101, 1)]
+            steps = [i / 20 for i in range(0, 21, 1)]
             for i in steps:
                 self._robot.grasp(i)
                 for _ in range(5):
@@ -318,7 +320,7 @@ class iCubGraspResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         d_hand_obj = goal_distance(achieved_goal[:3], achieved_goal[6:9])
         d_fingers = goal_distance(achieved_goal[-20:], goal[-20:])
         # cost: object-hand collision
-        if d_hand_obj >= 0.11 and self._world.check_contact(self._robot.robot_id):
+        if d_hand_obj > self._distance_threshold and self._world.check_contact(self._robot.robot_id):
             return np.float32(-10.0)
 
         r = -np.float32(d_hand_obj > self._distance_threshold or
