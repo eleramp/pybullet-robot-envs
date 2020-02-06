@@ -23,7 +23,7 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
     def __init__(self,
                  log_file=currentdir,
-                 action_repeat=30,
+                 action_repeat=20,
                  control_arm='l',
                  control_orientation=1,
                  control_eu_or_quat=0,
@@ -96,8 +96,10 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._grasp_pose = []
 
         # initialize simulation environment
+        self._first_call = 1
         self.seed()
         self.reset()
+        self._first_call = 0
 
         # Define spaces
         self.observation_space, self.action_space = self.create_spaces()
@@ -126,9 +128,9 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         # Configure action space
         action_dim = self._robot.get_action_dim()
         action_bound = 1
-        action_high = np.array([action_bound] * action_dim)
-        action_space = spaces.Box(-action_high, action_high, dtype='float32')
-
+        action_high = np.array([0.08, 0.08, 0.08, 0.785, 0.2, 1])
+        action_low = np.array([-0.08, -0.08, -0.08, -0.785, -0.2, -1])
+        action_space = spaces.Box(action_low, action_high, dtype='float32')
         return observation_space, action_space
 
     def reset(self):
@@ -151,25 +153,27 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         self._robot.reset()
         # Let the world run for a bit
-        for _ in range(100):
+        for _ in range(50):
             p.stepSimulation()
 
         self._robot.pre_grasp()
 
         self._world.reset()
         # Let the world run for a bit
-        for _ in range(300):
+        for _ in range(10):
             p.stepSimulation()
 
         self._robot.debug_gui()
         self._world.debug_gui()
 
-        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
-                                    starting_pose=self._robot._home_hand_pose)
+        if self._first_call:
+            self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
+                                        starting_pose=self._robot._home_hand_pose)
 
-        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
+            self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
 
-        self.compute_grasp_pose()
+            self.compute_grasp_pose()
+
         self._base_controller.compute_approach_path()
 
         self.debug_gui()
@@ -183,7 +187,7 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
 
         # Let the world run for a bit
-        for _ in range(100):
+        for _ in range(50):
             p.stepSimulation()
 
         # compute goal
@@ -221,7 +225,9 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
             else:
                 w_quat = world_obs[3:7]
 
-            inv_gp_pose = p.invertTransform(world_obs[:3], w_quat)
+            gp = self._grasp_pose.copy()
+
+            inv_gp_pose = p.invertTransform(gp[:3], p.getQuaternionFromEuler(gp[3:6]))
             obj_pos_in_gp, obj_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
                                                                 world_obs[:3], w_quat)
 
@@ -256,23 +262,34 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
             'is_success': self._is_success(obs['achieved_goal'], self.goal),
         }
 
-        done = self._termination() # or info['is_success']
+        done = self._termination() or info['is_success']
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
-        #print("reward")
-        #print(reward)
+        print("reward")
+        print(reward)
 
         return obs, np.array(reward), np.array(done), info
 
     def _is_success(self, achieved_goal, goal):
         # Compute distance between goal and the achieved goal.
         d = goal_distance(achieved_goal[:3], goal[:3])
-        if d <= self._distance_threshold:
+
+        # check if object has fallen
+        w_obs, _ = self._world.get_observation()
+        if self._control_eu_or_quat is 1:
+            eu = p.getEulerFromQuaternion(w_obs[3:7])
+        else:
+            eu = w_obs[3:6]
+
+
+        if d <= self._distance_threshold and self._t_grasp >= 1
+                     and not self._object_fallen(eu[0], eu[1]):
             print("SUCCESS")
-        return d <= self._distance_threshold
+            
+        return d <= self._distance_threshold and not self._object_fallen(eu[0], eu[1])
 
     def compute_reward(self, achieved_goal, goal, info):
-        r = np.float32(-1.0)
+        r = np.float32(0.0)
         w_obs, _ = self._world.get_observation()
 
         if self._control_eu_or_quat is 1:
@@ -282,13 +299,22 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         # cost: object falls
         if self._object_fallen(eu[0], eu[1]):
-            return np.float32(-100.0)
+            r += np.float32(-10.0)
+
+        # cost: object falls
+        if self._world.check_contact(self._robot.robot_id):
+            r += np.float32(-1.0)
 
         # Compute distance between goal and the achieved goal.
         d = goal_distance(achieved_goal[:3], goal[:3])
 
-        # cost: object falls
-        if d >= 0.1 and self._world.check_contact(self._robot.robot_id):
-            return np.float32(-10.0)
+        if d <= self._distance_threshold:
+            r += np.float32(10.0)
+            self._t_grasp += self._time_step*self._action_repeat
+        else:
+            self._t_grasp = 0
 
-        return -(d > self._distance_threshold).astype(np.float32)
+        if d <= self._distance_threshold and self._t_grasp >= 1:
+            r += np.float32(100.0)
+
+        return r
