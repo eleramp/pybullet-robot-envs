@@ -149,16 +149,19 @@ class iCubEnv:
         # Cartesian world pos/orn of left hand center of mass
         observation = []
         observation_lim = []
-        state = p.getLinkState(self.robot_id, self._end_eff_idx, computeLinkVelocity=1)
+        state = p.getLinkState(self.robot_id, self._end_eff_idx, computeLinkVelocity=1,
+                                computeForwardKinematics=1)
         pos = state[0]
         orn = state[1]
 
         vel_l = state[6]
         vel_a = state[7]
 
+        # cartesian position
         observation.extend(list(pos))
         observation_lim.extend(list(self._workspace_lim))
 
+        # cartesian orientation
         if self._control_eu_or_quat is 0:
             euler = p.getEulerFromQuaternion(orn)
             observation.extend(list(euler))  # roll, pitch, yaw
@@ -167,9 +170,62 @@ class iCubEnv:
             observation.extend(list(orn))  # roll, pitch, yaw
             observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
 
-        #observation.extend(list(vel_l))
-        #observation.extend(list(vel_a))
+        # cartesian velocities (linear and angular)
+        observation.extend(list(vel_l))
+        observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
+        observation.extend(list(vel_a))
+        observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
 
+        # finger tips
+        tips_idxs = [3,7,11,15,19]
+        if self._control_arm is 'l':
+            finger_idxs = self._indices_left_hand
+        else:
+            finger_idxs = self._indices_right_hand
+
+        # tip_1 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[0]])
+        # tip_2 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[1]])
+        # tip_3 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[2]])
+        # tip_4 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[3]])
+        # tip_5 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[4]])
+
+        # # finger tips positions
+        # observation.extend(list(tip_1[0]))
+        # observation_lim.extend(list(self._workspace_lim))
+        # observation.extend(list(tip_2[0]))
+        # observation_lim.extend(list(self._workspace_lim))
+        # observation.extend(list(tip_3[0]))
+        # observation_lim.extend(list(self._workspace_lim))
+        # observation.extend(list(tip_4[0]))
+        # observation_lim.extend(list(self._workspace_lim))
+        # observation.extend(list(tip_5[0]))
+        # observation_lim.extend(list(self._workspace_lim))
+        #
+        # # finger tips orientations
+        # if self._control_eu_or_quat is 0:
+        #     observation.extend(list(p.getEulerFromQuaternion(tip_1[1])))
+        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
+        #     observation.extend(list(p.getEulerFromQuaternion(tip_2[1])))
+        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
+        #     observation.extend(list(p.getEulerFromQuaternion(tip_3[1])))
+        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
+        #     observation.extend(list(p.getEulerFromQuaternion(tip_4[1])))
+        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
+        #     observation.extend(list(p.getEulerFromQuaternion(tip_5[1])))
+        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
+        # else:
+        #     observation.extend(list(tip_1[1]))
+        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+        #     observation.extend(list(tip_2[1]))
+        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+        #     observation.extend(list(tip_3[1]))
+        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+        #     observation.extend(list(tip_4[1]))
+        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+        #     observation.extend(list(tip_5[1]))
+        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+
+        # joints poses
         joint_states = p.getJointStates(self.robot_id, self._motor_idxs)
         joint_poses = [x[0] for x in joint_states]
         observation.extend(list(joint_poses))
