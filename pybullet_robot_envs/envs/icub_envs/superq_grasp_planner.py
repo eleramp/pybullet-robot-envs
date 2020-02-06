@@ -293,7 +293,7 @@ class SuperqGraspPlanner:
         n_pt = int(dist_object / dist_intra_path_points)
         i_path = [i / n_pt for i in range(0, n_pt + 1)]
 
-        for idx in i_path[-10:]:
+        for idx in i_path[-6:]:
             # --- Position --- #
             delta_pos = idx * np.array(sp_P_gp[0])
 
