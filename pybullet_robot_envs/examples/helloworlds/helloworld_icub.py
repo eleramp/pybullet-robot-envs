@@ -125,12 +125,14 @@ def main():
     # close fingers
     pos = [0, 0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 0,  0.3, 0.5, 0.9, 1.57, 0.6, 0.4, 0.7]
 
-    steps = [i/60 for i in range(0, 61, 1)]
+    steps = [i/100 for i in range(0, 101, 1)]
     for s in steps:
         next_pos = np.multiply(pos, s)
         p.setJointMotorControlArray(icubId, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
-                                    forces=[50] * len(range(52, 72)))
-        p.setJointMotorControlArray(icubId, [50, 68], p.POSITION_CONTROL, targetPositions=[0.5, 1.57], forces=[50, 50])
+                                    forces=[500] * len(range(52, 72)))
+        p.setJointMotorControlArray(icubId, jointIds[:-20], p.POSITION_CONTROL, targetPositions=jointPoses[:-20],
+                                    forces=[500]*len(jointIds[:-20]))
+        p.setJointMotorControlArray(icubId, [50, 68], p.POSITION_CONTROL, targetPositions=[0.5, 1.57], forces=[500, 500])
         for _ in range(5):
             p.stepSimulation()
 
@@ -159,13 +161,15 @@ def main():
     # open fingers
     pos = [0, 0.3, 0.5, 0.9, 0, 0.3, 0.5, 0.9, 0, 0.3, 0.5, 0.9, 0, 0.3, 0.5, 0.9, 1.57, 0.6, 0.4, 0.7]
 
-    steps = [i / 100 for i in range(100, -1, -1)]
+    steps = [i / 20 for i in range(20, -1, -1)]
     for s in steps:
         next_pos = np.multiply(pos, s)
         p.setJointMotorControlArray(icubId, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
-                                    forces=[20] * len(range(52, 72)))
+                                    forces=[500] * len(range(52, 72)))
+        p.setJointMotorControlArray(icubId, jointIds[:-20], p.POSITION_CONTROL, targetPositions=jointPoses[:-20],
+                                    forces=[500] * len(jointIds[:-20]))
         p.setJointMotorControlArray(icubId, [68], p.POSITION_CONTROL, targetPositions=[1.57],
-                                    forces=[50])
+                                    forces=[500])
         for _ in range(4):
             p.stepSimulation()
 
@@ -192,7 +196,8 @@ def main():
         new_pos = []
         for i in paramIds:
             new_pos.append(p.readUserDebugParameter(i))
-        p.setJointMotorControlArray(icubId, jointIds, p.POSITION_CONTROL, targetPositions=new_pos, forces=[50]*len(jointIds))
+        p.setJointMotorControlArray(icubId, jointIds, p.POSITION_CONTROL, targetPositions=new_pos,
+                                    forces=[500]*len(jointIds))
 
         p.stepSimulation()
         time.sleep(0.01)
