@@ -46,7 +46,7 @@ class iCubHandsEnv(iCubEnv):
         self._home_hand_pose = []
         self._home_motor_pose = []
 
-        self._grasp_pos = [0, 0.4, 0.35, 0.05, 0, 0.35, 0.4, 0.05, 0, 0.35, 0.4, 0.05, 0, 0.35, 0.4, 0.05, 1.57, 0.6, 0.1, 0.05]
+        self._grasp_pos = [0, 0.6, 0.5, 0.5, 0, 0.6, 0.5, 0.5, 0, 0.6, 0.5, 0.5, 0, 0.6, 0.5, 0.5, 1.57, 0.4, 0.1, 0.07]
 
         self._workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
         self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi, m.pi]]
@@ -197,8 +197,42 @@ class iCubHandsEnv(iCubEnv):
 
     def checkContacts(self, obj_id):
         points = p.getContactPoints(self.robot_id, obj_id)
+
         if len(points) > 0:
             print("contacts! {}".format(len(points)))
             return True
 
         return False
+
+    def check_contact_fingertips(self, obj_id):
+        # finger tips
+        tips_idxs = [3, 7, 11, 15, 19]
+        if self._control_arm is 'l':
+            finger_idxs = self._indices_left_hand
+        else:
+            finger_idxs = self._indices_right_hand
+
+        p0 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[0]])
+        p1 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[1]])
+        p2 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[2]])
+        p3 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[3]])
+        p4 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[4]])
+
+        fingers_in_contact = 0
+        if len(p0) > 0:
+            fingers_in_contact += 1
+            print("p0! {}".format(len(p0)))
+        if len(p1) > 0:
+            fingers_in_contact += 1
+            print("p1! {}".format(len(p1)))
+        if len(p2) > 0:
+            fingers_in_contact += 1
+            print("p2! {}".format(len(p2)))
+        if len(p3) > 0:
+            fingers_in_contact += 1
+            print("p3! {}".format(len(p3)))
+        if len(p4) > 0:
+            fingers_in_contact += 1
+            print("p4! {}".format(len(p4)))
+
+        return fingers_in_contact
