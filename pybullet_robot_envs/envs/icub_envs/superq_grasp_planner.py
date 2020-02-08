@@ -19,7 +19,8 @@ class SuperqGraspPlanner:
 
     def __init__(self, icub_id, obj_id,
                  robot_base_pose=((0.0,) * 3, (0.0,)*4),
-                 grasping_hand='l', noise_pcl=0.02, render=True):
+                 grasping_hand='l', noise_pcl=0.02,
+                 grasp_fingers_pose=[0]*20, render=True):
 
         self._grasping_hand = grasping_hand
         self._noise_pcl = noise_pcl
@@ -30,6 +31,7 @@ class SuperqGraspPlanner:
         self._icub_hand_left_orn =[0.0, -m.pi/2, m.pi/2]
         self._starting_pose = []
         self._best_grasp_pose = []
+        self._grasp_fingers_pose = grasp_fingers_pose
         self._approach_path = []
         self._action = [np.zeros(3), np.zeros(3), np.zeros(1)]
         self._obj_info = []
@@ -323,31 +325,37 @@ class SuperqGraspPlanner:
         tg_h_obj = 0.85
 
         # Check if done
-        if obj_pose[2] >= (tg_h_obj - atol*2):
-            #print("DONE")
-            self._action = [self._action[0], self._action[1], np.array([-0.5])]
+        if obj_pose[2] >= (tg_h_obj - atol):
+            print("DONE")
+            self._action = [self._action[0], self._action[1], np.array([1])]
             return self._action
 
         # Approach the object
         if self._approach_path:
             #print("APPROACH")
             next_pose = self._approach_path.pop()
-            self._action = [np.array(next_pose[0]), np.array(next_pose[1]), np.array([1])]
+            self._action = [np.array(next_pose[0]), np.array(next_pose[1]), np.array([-2])]
             return self._action
 
         # Grasp the object
-        if not self._object_grasped():
-            #print("GRASP")
-            self._action = [self._action[0], self._action[1], np.array([-1])]
+        if not self._hand_closed(robot_obs[-20:]):
+            print("GRASP")
+            self._action = [self._action[0], self._action[1], np.array([1])]
             return self._action
 
         # Lift the object
-       # print("LIFT")
+        print("LIFT")
         action = self._action
         action[0][2] = tg_h_obj
-        action = [action[0], action[1], np.array([-1])]
+        action = [action[0], action[1], np.array([0])]
         return action
 
+    def _hand_closed(self, finger_poses):
+        d = goal_distance(np.array(self._grasp_fingers_pose), np.array(finger_poses))
+        print("dist fingers {}".format(d))
+        return goal_distance(np.array(self._grasp_fingers_pose), np.array(finger_poses)) <= 0.47
+
+    """
     def _next_pose(self, hand_pose):  # not used
         if not self._approach_path:
             print("Approach path is empty. Can't get next way-point")
@@ -384,18 +392,11 @@ class SuperqGraspPlanner:
         cp_eu_tp = p.getEulerFromQuaternion([cp_q_tp[1], cp_q_tp[2], cp_q_tp[3], cp_q_tp[0]])
 
         return [rel_pos, np.array(list(cp_eu_tp)), np.array([0.5])]
+    """
 
     def _object_approached(self, hand_pose, obj_pose, atol): #not used
         return goal_distance(np.array(hand_pose[:3]), np.array(obj_pose[:3])) < 0.1
 
-    def _object_grasped(self):
-        # check if there is a constraint between hand and object
-        id = p.getConstraintUniqueId(p.getNumConstraints()-1)
-        info = p.getConstraintInfo(id)
-        if info[0] is self._icub_id and info[2] is self._obj_id:
-            return True
-
-        return False
 
     def _debug_gui(self, points):
         for pt in points:
