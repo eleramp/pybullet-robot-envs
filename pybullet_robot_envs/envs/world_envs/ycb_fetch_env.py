@@ -13,9 +13,9 @@ from ycb_objects_models_sim import objects
 def get_ycb_objects_list():
     obj_list = [
         'YcbMustardBottle',
-        'YcbBanana',
         'YcbChipsCan',
         'YcbCrackerBox',
+        'YcbBanana',
         'YcbFoamBrick',
         'YcbGelatinBox',
         'YcbHammer',
