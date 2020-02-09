@@ -192,8 +192,8 @@ class iCubHandsEnv(iCubEnv):
 
         next_pos = np.multiply(self._grasp_pos, step)
         p.setJointMotorControlArray(self.robot_id, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
-                                    forces=[50] * len(range(52, 72)))
-        p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=50)
+                                    forces=[500] * len(range(52, 72)))
+        p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
 
     def checkContacts(self, obj_id):
         points = p.getContactPoints(self.robot_id, obj_id)

@@ -177,11 +177,11 @@ class iCubEnv:
         observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
 
         # finger tips
-        tips_idxs = [3,7,11,15,19]
-        if self._control_arm is 'l':
-            finger_idxs = self._indices_left_hand
-        else:
-            finger_idxs = self._indices_right_hand
+        # tips_idxs = [3,7,11,15,19]
+        # if self._control_arm is 'l':
+        #     finger_idxs = self._indices_left_hand
+        # else:
+        #     finger_idxs = self._indices_right_hand
 
         # tip_1 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[0]])
         # tip_2 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[1]])
