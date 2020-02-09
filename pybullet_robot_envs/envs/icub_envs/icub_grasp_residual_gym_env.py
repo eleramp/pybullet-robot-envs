@@ -24,7 +24,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
     def __init__(self,
                  log_file=os.path.join(currentdir),
-                 action_repeat=20,
+                 action_repeat=10,
                  control_arm='l',
                  control_orientation=1,
                  control_eu_or_quat=0,
@@ -54,7 +54,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         self._last_frame_time = 0
         self._use_superq = use_superq
         self._distance_threshold = 0.03
-        self._target_h_lift = 0.75
+        self._target_h_lift = 0.85
 
         self._log_file = []
         self._log_file_path = []
@@ -164,13 +164,13 @@ class iCubGraspResidualGymEnv(gym.Env):
         self._world.debug_gui()
         robot_obs, _ = self._robot.get_observation()
 
-        #if self._first_call:
-        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
-                                        starting_pose=self._robot._home_hand_pose)
+        if self._first_call:
+            self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
+                                            starting_pose=self._robot._home_hand_pose)
 
-        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
+            self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
 
-        self.compute_grasp_pose()
+            self.compute_grasp_pose()
         self._base_controller.compute_approach_path()
 
         self.debug_gui()
@@ -388,7 +388,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         # send open/close command to fingers
         self._robot.grasp(self._grasp_steps[self._grasp_idx])
 
-        for _ in range(2):
+        for _ in range(5):
             p.stepSimulation()
             time.sleep(self._time_step)
             if self._termination():
@@ -508,25 +508,29 @@ class iCubGraspResidualGymEnv(gym.Env):
         # cost 3: distance between hand and grasp pose
         r_obs, _ = self._robot.get_observation()
         # Compute distance between hand and obj.
-        c3 = goal_distance(np.array(r_obs[:3]), np.array(w_obs[:3]))
+        c3 = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
         if c3 <= self._distance_threshold:
-            r += np.float32(5.0)
+            r += np.float32(2.0)
+            print("r dist")
             self._t_grasp += self._time_step * self._action_repeat
         else:
             self._t_grasp = 0
 
         # add reward su contact on fingertips? with t_grasp >=0
         if self._t_grasp > 0:
-            r += np.float32(self._robot.check_contact_fingertips(self._world.obj_id)) * 2
+            r += np.float32(self._robot.check_contact_fingertips(self._world.obj_id))
+            print("r fingercontact")
             c1 = 0
 
-        # reward: when object lifted of target_h_object for > 3 secs
+        # reward: when object lifted of target_h_object for > n secs
         if self._object_lifted(w_obs[2], self._target_h_lift):
             r += np.float32(20.0)
+            print("r lift")
             self._t_lift += self._time_step * self._action_repeat
         else:
             self._t_lift = 0
 
+        print("obj pos {}".format(w_obs[:3]))
         if self._object_lifted(w_obs[2], self._target_h_lift) and self._t_lift >= 0.1:  # secs
             r = np.float32(100.0)
 
