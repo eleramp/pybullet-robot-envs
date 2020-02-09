@@ -1,11 +1,22 @@
 import numpy as np
 import math as m
+import quaternion
+import warnings
 
-def goal_distance(a: object, b: object) -> object:
+def goal_distance(a: object, b: object):
     if not a.shape == b.shape:
-        raise AssertionError("distance(): shape of points mismatch")
+        raise AssertionError("goal_distance(): shape of points mismatch")
     return np.linalg.norm(a - b, axis=-1)
 
+def quat_distance(a: object, b: object):
+    if not a.shape == b.shape and a.shape == 4:
+        raise AssertionError("quat_distance(): wrong shape of points")
+    elif not (np.linalg.norm(a) == 1.0 and np.linalg.norm(b) == 1.0):
+        warnings.warn("quat_distance(): vector(s) without unitary norm {} , {}".format(np.linalg.norm(a), np.linalg.norm(b)))
+
+    inner_quat_prod = a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3]
+    dist = 1 - inner_quat_prod*inner_quat_prod
+    return dist
 
 def axis_angle_to_quaternion(vec_aa):
     qx = vec_aa[0] * m.sin(vec_aa[3] / 2)
