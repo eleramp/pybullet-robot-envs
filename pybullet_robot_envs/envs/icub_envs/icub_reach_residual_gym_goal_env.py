@@ -14,7 +14,7 @@ from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_env import iCubG
 from pybullet_robot_envs.envs.world_envs.ycb_fetch_env import get_ycb_objects_list, YcbWorldFetchEnv
 from pybullet_robot_envs.envs.icub_envs.superq_grasp_planner import SuperqGraspPlanner
 
-from pybullet_robot_envs.envs.utils import goal_distance
+from pybullet_robot_envs.envs.utils import goal_distance, quat_distance
 
 
 class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
@@ -160,7 +160,7 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
 
         self._world.reset()
         # Let the world run for a bit
-        for _ in range(10):
+        for _ in range(150):
             p.stepSimulation()
 
         self._robot.debug_gui()
@@ -196,58 +196,34 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         self._t_grasp, self._t_lift = 0, 0
 
         obs = self.get_goal_observation()
+
         return obs
 
     def _compute_goal(self):
 
-        if self._use_superq:
-            sq_pos = self._superqs[0].center.copy()
-            sq_eu = self._superqs[0].ea.copy()
+        world_obs, _ = self._world.get_observation()
+        gp = self._grasp_pose.copy()
 
-            gp = self._grasp_pose.copy()
+        if self._control_eu_or_quat is 0:
+            np.array(list(gp[:3]) + list(world_obs[3:6]))
 
-            # relative sq position wrt grasping pose
-            inv_gp_pose = p.invertTransform(gp[:3], p.getQuaternionFromEuler(gp[3:6]))
-            sq_pos_in_gp, sq_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
-                                                              sq_pos, p.getQuaternionFromEuler(sq_eu))
-            if self._control_eu_or_quat is 0:
-                sq_eu_in_gp = p.getEulerFromQuaternion(sq_orn_in_gp)
-                return np.array(list(sq_pos_in_gp) + list(sq_eu_in_gp))
+        return np.array(list(gp[:3]) + list(world_obs[3:7]))
 
-            return np.array(list(sq_pos_in_gp) + list(sq_orn_in_gp))
-
-        else:
-            # relative obj position wrt grasping pose
-            world_obs, _ = self._world.get_observation()
-
-            if self._control_eu_or_quat is 0:
-                w_quat = p.getQuaternionFromEuler(world_obs[3:6])
-            else:
-                w_quat = world_obs[3:7]
-
-            gp = self._grasp_pose.copy()
-
-            inv_gp_pose = p.invertTransform(gp[:3], p.getQuaternionFromEuler(gp[3:6]))
-            obj_pos_in_gp, obj_orn_in_gp = p.multiplyTransforms(inv_gp_pose[0], inv_gp_pose[1],
-                                                                world_obs[:3], w_quat)
-
-            if self._control_eu_or_quat is 0:
-                obj_eu_in_gp = p.getEulerFromQuaternion(obj_orn_in_gp)
-                return np.array(list(obj_pos_in_gp) + list(obj_eu_in_gp))
-            else:
-                return np.array(list(obj_pos_in_gp) + list(obj_orn_in_gp))
 
     def get_goal_observation(self):
         obs, _ = self.get_extended_observation()
+        robot_obs, _ = self._robot.get_observation()
+        world_obs, _ = self._world.get_observation()
 
         if self._control_eu_or_quat is 0:
-            obj_pos_in_hand = obs[-6:]
+            achieved_goal = robot_obs[:3] + world_obs[3:6]
         else:
-            obj_pos_in_hand = obs[-7:]
+            achieved_goal = robot_obs[:3] + world_obs[3:7]
+
 
         return {
             'observation': obs.copy(),
-            'achieved_goal': np.array(obj_pos_in_hand),
+            'achieved_goal': np.array(achieved_goal),
             'desired_goal': self.goal.copy(),
         }
 
@@ -265,8 +241,8 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         done = self._termination() or info['is_success']
 
         reward = self.compute_reward(obs['achieved_goal'], self.goal, info)
-        print("reward")
-        print(reward)
+        #print("reward")
+        #print(reward)
 
         return obs, np.array(reward), np.array(done), info
 
@@ -281,12 +257,19 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         else:
             eu = w_obs[3:6]
 
+        if self._control_eu_or_quat is 0:
+            q_1 = p.getQuaternionFromEuler(achieved_goal[3:6])
+            q_2 = p.getQuaternionFromEuler(goal[3:6])
+        else:
+            q_1 = achieved_goal[3:7]
+            q_2 = goal[3:7]
 
-        if d <= self._distance_threshold and self._t_grasp >= 1
-                     and not self._object_fallen(eu[0], eu[1]):
+        d_o = quat_distance(np.array(q_1), np.array(q_2))
+
+        if d <= self._distance_threshold and d_o <= 0.1 and self._t_grasp >= 1 and not self._object_fallen(eu[0], eu[1]):
             print("SUCCESS")
-            
-        return d <= self._distance_threshold and not self._object_fallen(eu[0], eu[1])
+
+        return d <= self._distance_threshold and d_o <= 0.1 and self._t_grasp >= 1 and not self._object_fallen(eu[0], eu[1])
 
     def compute_reward(self, achieved_goal, goal, info):
         r = np.float32(0.0)
@@ -308,13 +291,22 @@ class iCubReachResidualGymGoalEnv(gym.GoalEnv, iCubGraspResidualGymEnv):
         # Compute distance between goal and the achieved goal.
         d = goal_distance(achieved_goal[:3], goal[:3])
 
-        if d <= self._distance_threshold:
+        if self._control_eu_or_quat is 0:
+            q_1 = p.getQuaternionFromEuler(achieved_goal[3:6])
+            q_2 = p.getQuaternionFromEuler(goal[3:6])
+        else:
+            q_1 = achieved_goal[3:7]
+            q_2 = goal[3:7]
+
+        d_o = quat_distance(np.array(q_1), np.array(q_2))
+
+        if d <= self._distance_threshold and d_o <= 0.1:
             r += np.float32(10.0)
             self._t_grasp += self._time_step*self._action_repeat
         else:
             self._t_grasp = 0
 
-        if d <= self._distance_threshold and self._t_grasp >= 1:
+        if d <= self._distance_threshold and d_o <= 0.1 and self._t_grasp >= 1:
             r += np.float32(100.0)
 
         return r
