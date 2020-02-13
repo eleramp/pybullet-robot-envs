@@ -33,7 +33,7 @@ class SuperqGraspPlanner:
         self._best_grasp_pose = []
         self._grasp_fingers_pose = grasp_fingers_pose
         self._approach_path = []
-        self._action = [np.zeros(3), np.zeros(3), np.zeros(1)]
+        self._action = [np.zeros(3), np.array([0,0,0,1]), np.zeros(1)]
         self._obj_info = []
         self._icub_id = icub_id
         self._obj_id = obj_id
@@ -53,7 +53,7 @@ class SuperqGraspPlanner:
         self._starting_pose = starting_pose
         self._best_grasp_pose = []
         self._approach_path = []
-        self._action = [np.zeros(3), np.zeros(3), np.zeros(1)]
+        self._action = [np.zeros(3), np.array([0,0,0,1]), np.zeros(1)]
         self._obj_info = []
         self._icub_id = robot_id
         self._obj_id = obj_id
@@ -198,6 +198,7 @@ class SuperqGraspPlanner:
         return np.size(self._superqs, 0) >= 0
 
     def estimate_grasp(self):
+        self._best_grasp_pose = []
 
         if np.size(self._superqs, 0) is 0:
             print("No available superquadrics. Please call estimate_superq()")
@@ -211,6 +212,12 @@ class SuperqGraspPlanner:
         grasp_res_hand = self._grasp_estimator.computeGraspPoses(sq)
 
         if np.size(grasp_res_hand.grasp_poses, 0) is 0:
+            return False
+
+
+        gp = grasp_res_hand.grasp_poses[0]
+        print("grasp poses \n {}".format(gp.position))
+        if np.linalg.norm((gp.position[0][0], gp.position[1][0], gp.position[2][0])) == 0.:
             return False
 
         # visualize them
@@ -293,7 +300,10 @@ class SuperqGraspPlanner:
         dist_object = np.linalg.norm(sp_P_gp[0])
         dist_intra_path_points = 0.02
         n_pt = int(dist_object / dist_intra_path_points)
-        i_path = [i / n_pt for i in range(0, n_pt + 1)]
+        if n_pt == 0:
+            i_path = [1]
+        else:
+            i_path = [i / n_pt for i in range(0, n_pt + 1)]
 
         for idx in i_path[-6:]:
             # --- Position --- #
@@ -326,15 +336,15 @@ class SuperqGraspPlanner:
 
         # Check if done
         if obj_pose[2] >= (tg_h_obj - atol):
-            print("DONE")
+            # print("DONE")
             self._action = [self._action[0], self._action[1], np.array([1])]
             return self._action
 
         # Approach the object
         if self._approach_path:
-            #print("APPROACH")
+            print("APPROACH")
             next_pose = self._approach_path.pop()
-            self._action = [np.array(next_pose[0]), np.array(next_pose[1]), np.array([-2])]
+            self._action = [np.array(next_pose[0]), np.array(next_pose[1]), np.array([-1])]
             return self._action
 
         # Grasp the object
@@ -352,7 +362,7 @@ class SuperqGraspPlanner:
 
     def _hand_closed(self, finger_poses):
         d = goal_distance(np.array(self._grasp_fingers_pose), np.array(finger_poses))
-        print("dist fingers {}".format(d))
+        # print("dist fingers {}".format(d))
         return goal_distance(np.array(self._grasp_fingers_pose), np.array(finger_poses)) <= 0.47
 
     """

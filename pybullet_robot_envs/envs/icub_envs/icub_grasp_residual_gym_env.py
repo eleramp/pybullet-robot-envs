@@ -24,7 +24,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
     def __init__(self,
                  log_file=os.path.join(currentdir),
-                 action_repeat=10,
+                 action_repeat=20,
                  control_arm='l',
                  control_orientation=1,
                  control_eu_or_quat=0,
@@ -366,7 +366,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         final_action_quat = quaternion.as_float_array(final_action_quat)
         final_action_quat_1 = [final_action_quat[1], final_action_quat[2], final_action_quat[3], final_action_quat[0]]
         # grasp
-        final_grasp_action = np.add(base_action[2], grasp_action*2)
+        final_grasp_action = np.add(base_action[2], grasp_action)
         if final_grasp_action >= 0.5:
             final_grasp_action = 1
             self._grasp_idx = min(self._grasp_idx + 1, len(self._grasp_steps) - 1)
@@ -510,7 +510,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         # Compute distance between hand and obj.
         c3 = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
         if c3 <= self._distance_threshold:
-            r += np.float32(2.0)
+            r += np.float32(3.0)
             print("r dist")
             self._t_grasp += self._time_step * self._action_repeat
         else:
@@ -518,7 +518,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         # add reward su contact on fingertips? with t_grasp >=0
         if self._t_grasp > 0:
-            r += np.float32(self._robot.check_contact_fingertips(self._world.obj_id))
+            r += np.float32(self._robot.check_contact_fingertips(self._world.obj_id))*2
             print("r fingercontact")
             c1 = 0
 

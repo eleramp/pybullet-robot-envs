@@ -404,7 +404,7 @@ class iCubGraspGymEnv(gym.Env):
         else:
             self._t_lift = 0
 
-        if self._object_lifted(w_obs[2], self._target_h_lift) and self._t_lift >= 2:  # secs
+        if self._object_lifted(w_obs[2], self._target_h_lift) and self._t_lift >= 1:  # secs
             r = np.float32(100.0)
 
         reward = r - (c1+c2)

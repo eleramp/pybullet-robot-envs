@@ -24,7 +24,7 @@ class iCubReachResidualGymEnv(gym.Env):
 
     def __init__(self,
                  log_file=os.path.join(currentdir),
-                 action_repeat=30,
+                 action_repeat=20,
                  control_arm='l',
                  control_orientation=1,
                  control_eu_or_quat=0,
@@ -151,6 +151,10 @@ class iCubReachResidualGymEnv(gym.Env):
 
         self._robot.pre_grasp()
 
+        obj_name = get_ycb_objects_list()[self.np_random.randint(0,3)]
+        self._world._obj_name = obj_name
+        print("obj_name {}".format(obj_name))
+
         self._world.reset()
         # Let the world run for a bit
         for _ in range(150):
@@ -160,13 +164,14 @@ class iCubReachResidualGymEnv(gym.Env):
         self._world.debug_gui()
         robot_obs, _ = self._robot.get_observation()
 
-        if self._first_call:
-            self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
-                                        starting_pose=self._robot._home_hand_pose)
+        #if self._first_call:
+        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
+                                    starting_pose=self._robot._home_hand_pose)
 
-            self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
+        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
 
-            self.compute_grasp_pose()
+        self.compute_grasp_pose()
+
         self._base_controller.compute_approach_path()
 
         self.debug_gui()
@@ -202,20 +207,21 @@ class iCubReachResidualGymEnv(gym.Env):
         ok = self._base_controller.compute_object_pointcloud(obj_pose)
         if not ok:
             print("Can't get good point cloud of the object")
-            return
+            return self.reset()
 
         ok = self._base_controller.estimate_superq()
         if not ok:
             print("can't compute good superquadrics")
-            return
+            return self.reset()
 
         ok = self._base_controller.estimate_grasp()
         if not ok:
             print("can't compute any grasp pose")
-            return
+            return self.reset()
 
         self._superqs = self._base_controller.get_superqs()
         self._grasp_pose = self._base_controller.get_grasp_pose()
+
 
         print("object pose: {}".format(world_obs))
         print("superq pose: {} {}".format(self._superqs[0].center, self._superqs[0].ea))
@@ -346,7 +352,8 @@ class iCubReachResidualGymEnv(gym.Env):
         world_obs, _ = self._world.get_observation()
 
         base_action = self._base_controller.get_next_action(robot_obs, world_obs)
-
+        print("base action {}".format(base_action))
+        
         final_action_pos = np.add(base_action[0], pos_action)
         final_action_quat = np.quaternion(base_action[1][3], base_action[1][0], base_action[1][1], base_action[1][2]) * \
                           np.quaternion(quat_action[3], quat_action[0], quat_action[1], quat_action[2])

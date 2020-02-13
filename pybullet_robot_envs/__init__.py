@@ -51,6 +51,19 @@ register(
 )
 
 register(
+        id='iCubReachResidual-v0',
+        entry_point='pybullet_robot_envs.envs:iCubReachResidualGymEnv',
+        max_episode_steps=1000,
+        kwargs={'control_arm': 'r',
+                'control_orientation': 1,
+                'obj_pose_rnd_std': 0.05,
+                'noise_pcl': 0.0,
+                'use_superq': 1,
+                'max_steps': 1000,
+                'renders': False},
+)
+
+register(
         id='iCubGraspResidual-v0',
         entry_point='pybullet_robot_envs.envs:iCubGraspResidualGymEnv',
         max_episode_steps=1000,

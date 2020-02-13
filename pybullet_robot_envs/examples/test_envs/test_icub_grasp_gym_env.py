@@ -8,6 +8,7 @@ os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib/superquadriclib/bind
 print(os.sys.path)
 
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_env import iCubGraspResidualGymEnv
+from pybullet_robot_envs.envs.icub_envs.icub_reach_residual_gym_env import iCubReachResidualGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_goal_env import iCubGraspResidualGymGoalEnv
 from pybullet_robot_envs.envs.icub_envs.icub_reach_residual_gym_goal_env import iCubReachResidualGymGoalEnv
 
@@ -24,7 +25,7 @@ import numpy as np
 
 def main(args):
     eu_or_quat = 0
-    env = iCubGraspResidualGymGoalEnv(renders=True, control_arm='r', obj_pose_rnd_std=0.0,  noise_pcl=0.00,
+    env = iCubReachResidualGymEnv(renders=True, control_arm='r', obj_pose_rnd_std=1,  noise_pcl=0.00,
                                       control_eu_or_quat=eu_or_quat)
     env.seed(1)
     motorsIds = []
@@ -37,7 +38,7 @@ def main(args):
         motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dv, dv, 0.0))
         motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dv, dv, 0.0))
         motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dv, dv, 0.0))
-        # motorsIds.append(env._p.addUserDebugParameter("close_open", -dv, dv, 0.0))
+        #motorsIds.append(env._p.addUserDebugParameter("close_open", -dv, dv, 0.0))
     else:
         motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
         motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
