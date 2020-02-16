@@ -9,7 +9,7 @@ import pybullet as p
 import math as m
 from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaternion, quaternion_to_axis_angle, sph_coord
 
-import pymesh
+import trimesh
 
 import superquadric_bindings
 from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimatorApp, Visualizer
@@ -131,7 +131,9 @@ class SuperqGraspPlanner:
         w_robot_R_obj = np.array([obj_matrix[0:3], obj_matrix[3:6], obj_matrix[6:9]])
 
         # Get points
-        obj_mesh = pymesh.load_mesh(self._obj_info[4])
+        encoding = 'utf-8'
+        mesh_file_name = (self._obj_info[4]).decode(encoding)
+        obj_mesh = trimesh.load(mesh_file_name)
 
         # Create gaussian noise to add to the point's distribution
         mu, sigma = 0.0, self._noise_pcl
@@ -139,8 +141,7 @@ class SuperqGraspPlanner:
 
         points = superquadric_bindings.deque_Vector3d()
         colors = superquadric_bindings.vector_vector_uchar()
-        counter = 1
-        rnd = 0
+
         for i, v in enumerate(obj_mesh.vertices):
             v0 = v * obj_scale
             v1 = collision_dcm.dot(v0) + collision_pose
@@ -150,14 +151,7 @@ class SuperqGraspPlanner:
             if sph_vec[1] <= m.pi/6 or -m.pi/2 <= sph_vec[2] <= m.pi/2:
                 v3 = v2 + w_robot_T_obj[0]
 
-                # if np.random.random()<0.2:
-                #   if rnd > 0 and counter > 0:
-                #       counter -= 1
                 v3 += noise[i]
-                    #continue
-                #else:
-                #    counter = 10000
-                #    rnd = np.random.random() < 0.01
 
                 points.push_back(v3)
                 colors.push_back([255, 255, 0])
