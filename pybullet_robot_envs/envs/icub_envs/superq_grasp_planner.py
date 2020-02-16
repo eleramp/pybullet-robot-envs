@@ -138,6 +138,7 @@ class SuperqGraspPlanner:
         # Create gaussian noise to add to the point's distribution
         mu, sigma = 0.0, self._noise_pcl
         noise = np.random.normal(mu, sigma, [obj_mesh.vertices.size, 3])
+        np.random.shuffle(noise)
 
         points = superquadric_bindings.deque_Vector3d()
         colors = superquadric_bindings.vector_vector_uchar()
