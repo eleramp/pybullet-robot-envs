@@ -323,6 +323,8 @@ class iCubGraspResidualGymEnv(gym.Env):
     def apply_action(self, action):
         # process action and send it to the robot
 
+        # print("commanded action {}".format(action))
+
         if self._renders:
             # Sleep, otherwise the computation takes less time than real time,
             # which will make the visualization like a fast-forward video.
@@ -385,6 +387,8 @@ class iCubGraspResidualGymEnv(gym.Env):
             if self._termination():
                 break
 
+            self._env_step_counter += 1
+
         # send open/close command to fingers
         self._robot.grasp(self._grasp_steps[self._grasp_idx])
 
@@ -393,8 +397,6 @@ class iCubGraspResidualGymEnv(gym.Env):
             time.sleep(self._time_step)
             if self._termination():
                 break
-
-            self._env_step_counter += 1
 
         # dump data
         self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat_1]])
@@ -461,6 +463,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         # early termination if object falls
         w_obs, _ = self._world.get_observation()
+        r_obs, _ = self._robot.get_observation()
 
         if self._control_eu_or_quat is 1:
             eu = p.getEulerFromQuaternion(w_obs[3:7])
@@ -472,13 +475,9 @@ class iCubGraspResidualGymEnv(gym.Env):
             print("FALLEN")
             return np.float32(1.)
 
-        # rew 1: distance between hand and grasp pose
-        # r_obs, _ = self._robot.get_observation()
-        # Compute distance between goal and the achieved goal.
-        # d = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
-        # if d <= self._distance_threshold and self._t_grasp >= 1:
-        #     print("SUCCESS")
-        #     return np.float32(1.)
+        if self._hand_lifted(r_obs[2], self._target_h_lift) and np.float32(self._robot.check_contact_fingertips(self._world.obj_id)) < 2:
+            print("FAIL LIFT")
+            return np.float32(1.)
 
         # here check lift for termination
         if self._object_lifted(w_obs[2], self._target_h_lift) and self._t_lift >= 0.1:
@@ -542,6 +541,9 @@ class iCubGraspResidualGymEnv(gym.Env):
         return obj_roll <= -0.785 or obj_roll >= 0.785 or obj_pitch <= -0.785 or obj_pitch >= 0.785
 
     def _object_lifted(self, z_obj, h_target, atol=0.05):
+        return z_obj >= h_target - atol
+
+    def _hand_lifted(self, z_obj, h_target, atol=0.05):
         return z_obj >= h_target - atol
 
     def debug_gui(self):
