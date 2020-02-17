@@ -5,13 +5,12 @@ from gym.envs.registration import register
 register(
         id='iCubReach-v0',
         entry_point='pybullet_robot_envs.envs:iCubReachGymEnv',
-        max_episode_steps=1000,
-        kwargs={ 'useIK': 1,
-                 'isDiscrete': 0,
-                 'control_arm': 'l',
-                 'control_orientation': 0,
-                 'rnd_obj_pose': 1,
-                 'max_steps': 1000},
+        max_episode_steps=500,
+        kwargs={ 'control_arm': 'r',
+                 'control_orientation': 1,
+                 'obj_pose_rnd_std': 0.05,
+                 'max_steps': 500,
+                 'renders': False},
 )
 
 register(

@@ -108,11 +108,11 @@ class iCubReachGymEnv(gym.Env):
         action_dim = self._robot.get_action_dim()
         action_bound = 1
         if self._control_eu_or_quat is 0:
-            action_high = np.array([0.01, 0.01, 0.01, 0.1, 0.1, 0.1, 1])
-            action_low = np.array([-0.01, -0.01, -0.01, -0.1, -0.1, -0.1, -1])
+            action_high = np.array([0.01, 0.01, 0.01, 0.1, 0.1, 0.1])
+            action_low = np.array([-0.01, -0.01, -0.01, -0.1, -0.1, -0.1])
         else:
-            action_high = np.array([0.01, 0.01, 0.01, 0.1, 0.1, 0.1,  0.1, 1])
-            action_low = np.array([-0.01, -0.01, -0.01, -0.1, -0.1, -0.1, -0.1, -1])
+            action_high = np.array([0.01, 0.01, 0.01, 0.1, 0.1, 0.1,  0.1])
+            action_low = np.array([-0.01, -0.01, -0.01, -0.1, -0.1, -0.1, -0.1])
 
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
@@ -137,6 +137,11 @@ class iCubReachGymEnv(gym.Env):
             p.stepSimulation()
 
         self._robot.pre_grasp()
+
+        obj_name = get_ycb_objects_list()[self.np_random.randint(0,3)]
+        self._world._obj_name = obj_name
+        print("obj_name {}".format(obj_name))
+        
         self._world.reset()
 
         # Let the world run for a bit
