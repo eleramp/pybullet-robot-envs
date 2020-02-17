@@ -1,7 +1,6 @@
 import os, inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
-os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib/superquadriclib/bindings')
 
 import numpy as np
 import quaternion
@@ -12,6 +11,8 @@ from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaterni
 import trimesh
 
 import superquadric_bindings
+print("superquadric_bindings {}".format(superquadric_bindings))
+
 from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimatorApp, Visualizer
 import config_superq_grasp_planner as cfg
 
@@ -327,7 +328,7 @@ class SuperqGraspPlanner:
         """
         hand_pose = robot_obs[:6]
         obj_pose = world_obs[:6]
-        tg_h_obj = 0.85
+        tg_h_obj = 0.9
 
         # Check if done
         if obj_pose[2] >= (tg_h_obj - atol):
