@@ -5,5 +5,9 @@ pandas
 ruamel.yaml
 tensorflow==1.14
 stable_baselines==2.9.0
+numpy
+numpy-quaternion
+trimesh
 git+https://github.com/eleramp/ycb-objects-models-sim.git
 git+https://github.com/eleramp/icub-model-pybullet.git
+
