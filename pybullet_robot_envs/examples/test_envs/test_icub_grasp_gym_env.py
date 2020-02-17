@@ -7,6 +7,7 @@ os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib/superquadriclib/bind
 
 print(os.sys.path)
 
+from pybullet_robot_envs.envs.icub_envs.icub_reach_gym_env import iCubReachGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_env import iCubGraspResidualGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_reach_residual_gym_env import iCubReachResidualGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_goal_env import iCubGraspResidualGymGoalEnv
@@ -19,13 +20,11 @@ parser.add_argument('--continueIK', action='store_const', const=1, dest="useIK",
 parser.add_argument('--arm', action='store', default='l', dest="arm",
                     help="choose arm to control: 'l' - left or 'r'-right")
 
-import pymesh
-import open3d as o3d
 import numpy as np
 
 def main(args):
     eu_or_quat = 0
-    env = iCubReachResidualGymEnv(renders=True, control_arm='r', obj_pose_rnd_std=1,  noise_pcl=0.00,
+    env = iCubReachGymEnv(renders=True, control_arm='r', obj_pose_rnd_std=0.07,
                                       control_eu_or_quat=eu_or_quat)
     env.seed(1)
     motorsIds = []
