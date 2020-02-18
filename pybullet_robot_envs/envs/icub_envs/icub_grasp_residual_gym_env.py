@@ -24,7 +24,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
     def __init__(self,
                  log_file=os.path.join(currentdir),
-                 action_repeat=20,
+                 action_repeat=15,
                  control_arm='l',
                  control_orientation=1,
                  control_eu_or_quat=0,
@@ -509,7 +509,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         # Compute distance between hand and obj.
         c3 = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
         if c3 <= self._distance_threshold:
-            r += np.float32(3.0)
+            r += np.float32(2.0)
             print("r dist")
             self._t_grasp += self._time_step * self._action_repeat
         else:
@@ -517,7 +517,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         # add reward su contact on fingertips? with t_grasp >=0
         if self._t_grasp > 0:
-            r += np.float32(self._robot.check_contact_fingertips(self._world.obj_id))*2
+            r += np.float32(self._robot.check_contact_fingertips(self._world.obj_id))
             print("r fingercontact")
             c1 = 0
 
