@@ -46,7 +46,7 @@ class iCubHandsEnv(iCubEnv):
         self._home_hand_pose = []
         self._home_motor_pose = []
 
-        self._grasp_pos = [0, 0.6, 0.5, 0.5, 0, 0.6, 0.5, 0.5, 0, 0.6, 0.5, 0.5, 0, 0.6, 0.5, 0.5, 1.57, 0.4, 0.1, 0.07]
+        self._grasp_pos = [0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 1.57, 0.4, 0.2, 0.07]
 
         self._workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
         self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi, m.pi]]

@@ -320,6 +320,12 @@ class SuperqGraspPlanner:
         self._approach_path.reverse()
         return True
 
+    def is_last_approach_step(self):
+        if len(self._approach_path) == 1:
+            return True
+
+        return False
+
     def get_next_action(self, robot_obs, world_obs, atol=1e-2):
         """
         Returns
@@ -330,35 +336,39 @@ class SuperqGraspPlanner:
         obj_pose = world_obs[:6]
         tg_h_obj = 0.9
 
+        done = False
+
         # Check if done
         if obj_pose[2] >= (tg_h_obj - atol):
             # print("DONE")
+            done = True
             self._action = [self._action[0], self._action[1], np.array([1])]
-            return self._action
+            return self._action, done
 
         # Approach the object
         if self._approach_path:
             print("APPROACH")
             next_pose = self._approach_path.pop()
             self._action = [np.array(next_pose[0]), np.array(next_pose[1]), np.array([-1])]
-            return self._action
+            return self._action, done
 
         # Grasp the object
         if not self._hand_closed(robot_obs[-20:]):
             print("GRASP")
             self._action = [self._action[0], self._action[1], np.array([1])]
-            return self._action
+            return self._action, done
 
         # Lift the object
         print("LIFT")
+        done = True
         action = self._action
         action[0][2] = tg_h_obj
         action = [action[0], action[1], np.array([0])]
-        return action
+        return action, done
 
     def _hand_closed(self, finger_poses):
         d = goal_distance(np.array(self._grasp_fingers_pose), np.array(finger_poses))
-        # print("dist fingers {}".format(d))
+        print("dist fingers {}".format(d))
         return goal_distance(np.array(self._grasp_fingers_pose), np.array(finger_poses)) <= 0.47
 
     """

@@ -180,7 +180,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         world_obs, _ = self._world.get_observation()
 
         # move hand to the first way point on approach trajectory
-        base_action = self._base_controller.get_next_action(robot_obs[:6], world_obs[:6])
+        base_action, done = self._base_controller.get_next_action(robot_obs[:6], world_obs[:6])
         self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
 
         # Let the world run for a bit
@@ -356,9 +356,10 @@ class iCubGraspResidualGymEnv(gym.Env):
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
 
-        base_action = self._base_controller.get_next_action(robot_obs, world_obs)
+        base_action, done = self._base_controller.get_next_action(robot_obs, world_obs)
 
         # superimpose actions:
+
         # pos
         final_action_pos = np.add(base_action[0], pos_action)
         # orn
@@ -367,6 +368,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         final_action_quat = quaternion.as_float_array(final_action_quat)
         final_action_quat_1 = [final_action_quat[1], final_action_quat[2], final_action_quat[3], final_action_quat[0]]
+
         # grasp
         final_grasp_action = np.add(base_action[2], grasp_action)
         if final_grasp_action >= 0.5:
