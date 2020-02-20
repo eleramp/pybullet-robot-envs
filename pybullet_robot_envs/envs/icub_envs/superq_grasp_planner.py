@@ -2,17 +2,15 @@ import os, inspect
 import numpy as np
 import pybullet as p
 import math as m
-from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaternion, quaternion_to_axis_angle, sph_coord
-
 import trimesh
 import superquadric_bindings
 
-from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimatorApp, Visualizer
-import pybullet_robot_envs.envs.icub_envs.config_superq_grasp_planner as cfg
-
-
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
+
+from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaternion, quaternion_to_axis_angle, sph_coord
+from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimatorApp, Visualizer
+import config_superq_grasp_planner as cfg
 
 
 class SuperqGraspPlanner:
