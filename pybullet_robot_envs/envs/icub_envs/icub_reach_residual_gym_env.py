@@ -6,13 +6,11 @@ import numpy as np
 import time
 import pybullet as p
 import math as m
-import quaternion
 
 from pybullet_robot_envs.envs.icub_envs.icub_env_with_hands import iCubHandsEnv
-from pybullet_robot_envs.envs.icub_envs.icub_env import iCubEnv
 from pybullet_robot_envs.envs.world_envs.ycb_fetch_env import get_ycb_objects_list, YcbWorldFetchEnv
 from pybullet_robot_envs.envs.icub_envs.superq_grasp_planner import SuperqGraspPlanner
-from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaternion
+from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
@@ -363,14 +361,9 @@ class iCubReachResidualGymEnv(gym.Env):
         
         final_action_pos = np.add(base_action[0], pos_action)
 
-        final_action_quat = np.quaternion(base_action[1][3], base_action[1][0], base_action[1][1], base_action[1][2]) *\
-                            np.quaternion(quat_action[3], quat_action[0], quat_action[1], quat_action[2])
+        final_action_quat = quat_multiplication(np.array(base_action[1]), np.array(quat_action))
 
-        final_action_quat = quaternion.as_float_array(final_action_quat)
-
-        final_action_quat_1 = [final_action_quat[1], final_action_quat[2], final_action_quat[3], final_action_quat[0]]
-
-        self._robot.apply_action(final_action_pos.tolist() + final_action_quat_1)
+        self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
 
         for _ in range(self._action_repeat):
             p.stepSimulation()
@@ -387,7 +380,7 @@ class iCubReachResidualGymEnv(gym.Env):
             for i in grasp_steps:
                 # send open/close command to fingers
                 self._robot.grasp(i)
-                self._robot.apply_action(final_action_pos.tolist() + final_action_quat_1)
+                self._robot.apply_action(final_action_pos.tolist() + final_action_quat)
 
                 for _ in range(7):
                     p.stepSimulation()
@@ -397,14 +390,14 @@ class iCubReachResidualGymEnv(gym.Env):
 
             self._robot.grasp(i)
             final_action_pos[2] += 0.1
-            self._robot.apply_action(final_action_pos.tolist() + final_action_quat_1)
+            self._robot.apply_action(final_action_pos.tolist() + final_action_quat)
 
             for _ in range(self._action_repeat):
                 p.stepSimulation()
                 time.sleep(self._time_step)
 
             final_action_pos[2] += 0.1
-            self._robot.apply_action(final_action_pos.tolist() + final_action_quat_1)
+            self._robot.apply_action(final_action_pos.tolist() + final_action_quat)
 
             for _ in range(self._action_repeat ):
                 p.stepSimulation()
@@ -413,9 +406,9 @@ class iCubReachResidualGymEnv(gym.Env):
             self._env_step_counter = self._max_steps
 
         # dump data
-        self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat_1]])
+        self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat]])
 
-        return final_action_pos.tolist() + final_action_quat_1
+        return final_action_pos.tolist() + final_action_quat
 
     def step(self, action):
 
