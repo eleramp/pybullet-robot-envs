@@ -404,9 +404,9 @@ class iCubGraspResidualGymEnv(gym.Env):
                 break
 
         # dump data
-        self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat]])
+        self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat.tolist()]])
 
-        return final_action_pos.tolist() + final_action_quat + [final_grasp_action]
+        return final_action_pos.tolist() + final_action_quat.tolist() + [final_grasp_action]
 
     def step(self, action):
         # apply action on the robot

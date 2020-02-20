@@ -34,7 +34,7 @@ def quat_multiplication(a: object, b: object):
     z12 = w1*z2 + x1*y2 - y1*x2 + z1*w2
     w12 = w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
 
-    return [x12, y12, z12, w12]
+    return np.array([x12, y12, z12, w12])
 
 
 def axis_angle_to_quaternion(vec_aa):

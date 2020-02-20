@@ -380,7 +380,7 @@ class iCubReachResidualGymEnv(gym.Env):
             for i in grasp_steps:
                 # send open/close command to fingers
                 self._robot.grasp(i)
-                self._robot.apply_action(final_action_pos.tolist() + final_action_quat)
+                self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
 
                 for _ in range(7):
                     p.stepSimulation()
@@ -390,14 +390,14 @@ class iCubReachResidualGymEnv(gym.Env):
 
             self._robot.grasp(i)
             final_action_pos[2] += 0.1
-            self._robot.apply_action(final_action_pos.tolist() + final_action_quat)
+            self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
 
             for _ in range(self._action_repeat):
                 p.stepSimulation()
                 time.sleep(self._time_step)
 
             final_action_pos[2] += 0.1
-            self._robot.apply_action(final_action_pos.tolist() + final_action_quat)
+            self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
 
             for _ in range(self._action_repeat ):
                 p.stepSimulation()
@@ -406,9 +406,9 @@ class iCubReachResidualGymEnv(gym.Env):
             self._env_step_counter = self._max_steps
 
         # dump data
-        self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat]])
+        self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat.tolist()]])
 
-        return final_action_pos.tolist() + final_action_quat
+        return final_action_pos.tolist() + final_action_quat.tolist()
 
     def step(self, action):
 
