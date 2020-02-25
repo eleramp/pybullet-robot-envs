@@ -41,7 +41,6 @@ class WorldFetchEnv:
         self._control_eu_or_quat = control_eu_or_quat
 
         # initialize
-        self.seed()
         self.reset()
 
     def reset(self):
@@ -105,9 +104,6 @@ class WorldFetchEnv:
             print("<<----------->> contact with object!!!!! <<----------------->>")
             return True
         return False
-
-    def seed(self, seed=None):
-        np.random.seed(seed)
 
     def debug_gui(self):
         p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.obj_id)

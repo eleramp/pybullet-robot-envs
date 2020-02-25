@@ -55,7 +55,6 @@ class YcbWorldFetchEnv(WorldFetchEnv):
         self._control_eu_or_quat = control_eu_or_quat
 
         # initialize
-        self.seed()
         self.reset()
 
     def reset(self):
