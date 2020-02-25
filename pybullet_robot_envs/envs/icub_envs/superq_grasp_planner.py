@@ -363,10 +363,10 @@ class SuperqGraspPlanner:
             return self._action, done
 
         # Grasp the object
-        if not self._hand_closed(robot_obs[-20:]):
-            # print("GRASP")
-            self._action = [self._action[0], self._action[1], np.array([1])]
-            return self._action, done
+        #if not self._hand_closed(robot_obs[-20:]):
+        #    # print("GRASP")
+        #    self._action = [self._action[0], self._action[1], np.array([1])]
+        #    return self._action, done
 
         # Lift the object
         # print("LIFT")
