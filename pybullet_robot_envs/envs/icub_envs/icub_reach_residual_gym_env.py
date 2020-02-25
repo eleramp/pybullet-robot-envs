@@ -15,6 +15,7 @@ from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
 
+DO_LOGGING = False
 
 class iCubReachResidualGymEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array'],
@@ -54,13 +55,14 @@ class iCubReachResidualGymEnv(gym.Env):
 
         self._log_file = []
         self._log_file_path = []
-        self._log_file_path.append(os.path.join(log_file, 'nominal.txt'))
-        self._log_file_path.append(os.path.join(log_file, 'learned.txt'))
-        self._log_file.append(open(self._log_file_path[0], "w+"))
-        self._log_file.append(open(self._log_file_path[1], "w+"))
+        if DO_LOGGING:
+            self._log_file_path.append(os.path.join(log_file, 'nominal.txt'))
+            self._log_file_path.append(os.path.join(log_file, 'learned.txt'))
+            self._log_file.append(open(self._log_file_path[0], "w+"))
+            self._log_file.append(open(self._log_file_path[1], "w+"))
 
-        self._log_file[0].close()
-        self._log_file[1].close()
+            self._log_file[0].close()
+            self._log_file[1].close()
 
         # Initialize PyBullet simulator
         self._p = p
@@ -96,6 +98,9 @@ class iCubReachResidualGymEnv(gym.Env):
         self._grasp_pose = []
 
         # initialize simulation environment
+        self.logId = None
+        self.logId_ct = None
+
         self._first_call = 1
         self.seed()
         self.reset()
@@ -103,7 +108,6 @@ class iCubReachResidualGymEnv(gym.Env):
 
         # Define spaces
         self.observation_space, self.action_space = self.create_spaces()
-
 
     def create_spaces(self):
         # Configure observation limits
@@ -128,13 +132,21 @@ class iCubReachResidualGymEnv(gym.Env):
         return observation_space, action_space
 
     def reset(self):
-        if not self._log_file[0].closed:
-            self._log_file[0].close()
-        self._log_file[0] = open(self._log_file_path[0], "a+")
 
-        if not self._log_file[1].closed:
-            self._log_file[1].close()
-        self._log_file[1] = open(self._log_file_path[1], "a+")
+        if DO_LOGGING:
+            if self.logId is not None:
+                p.stopStateLogging(self.logId)
+            if self.logId_ct is not None:
+                p.stopStateLogging(self.logId_ct)
+            print("logging closed")
+
+            if not self._log_file[0].closed:
+                self._log_file[0].close()
+            self._log_file[0] = open(self._log_file_path[0], "a+")
+
+            if not self._log_file[1].closed:
+                self._log_file[1].close()
+            self._log_file[1] = open(self._log_file_path[1], "a+")
 
         p.resetSimulation()
         p.setPhysicsEngineParameter(numSolverIterations=150)
@@ -151,36 +163,37 @@ class iCubReachResidualGymEnv(gym.Env):
 
         self._robot.pre_grasp()
 
-        #obj_name = get_ycb_objects_list()[self.np_random.randint(0,3)]
-        #self._world._obj_name = obj_name
-        #print("obj_name {}".format(obj_name))
+        obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
+        self._world._obj_name = obj_name
+        print("obj_name {}".format(obj_name))
 
         self._world.reset()
         # Let the world run for a bit
-        for _ in range(150):
+        for _ in range(200):
             p.stepSimulation()
 
-        self._robot.debug_gui()
-        self._world.debug_gui()
         robot_obs, _ = self._robot.get_observation()
 
-        if self._first_call:
-            self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
+        #if self._first_call:
+        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
                                         starting_pose=self._robot._home_hand_pose)
 
-            self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
+        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
 
-            self.compute_grasp_pose()
+        self.compute_grasp_pose()
 
         self._base_controller.compute_approach_path()
 
-        self.debug_gui()
-        p.stepSimulation()
+        if self._renders:
+            self._robot.debug_gui()
+            self._world.debug_gui()
+            self.debug_gui()
+            p.stepSimulation()
 
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
 
-        self._target_h_lift = world_obs[2] + 0.2
+        self._target_h_lift = world_obs[2] + 0.15
 
         # move hand to the first way point on approach trajectory
         base_action, done = self._base_controller.get_next_action(robot_obs[:6], world_obs[:6])
@@ -193,6 +206,15 @@ class iCubReachResidualGymEnv(gym.Env):
         self._t_grasp, self._t_lift = 0, 0
 
         obs, _ = self.get_extended_observation()
+
+        if DO_LOGGING:
+            print("------------------------>>>>>start logging")
+
+            self.logId = p.startStateLogging(p.STATE_LOGGING_GENERIC_ROBOT, "log_successful_grasp.bin")
+            self.logId_ct = p.startStateLogging(p.STATE_LOGGING_CONTACT_POINTS, "log_successful_grasp_ct.bin",
+                                                bodyUniqueIdA=self._robot.robot_id,
+                                                bodyUniqueIdB=self._world.obj_id)
+
         return obs
 
     def compute_grasp_pose(self):
@@ -224,7 +246,6 @@ class iCubReachResidualGymEnv(gym.Env):
         self._superqs = self._base_controller.get_superqs()
         self._grasp_pose = self._base_controller.get_grasp_pose()
 
-
         print("object pose: {}".format(world_obs))
         print("superq pose: {} {}".format(self._superqs[0].center, self._superqs[0].ea))
         print("grasp pose: {}".format(self._grasp_pose))
@@ -238,14 +259,11 @@ class iCubReachResidualGymEnv(gym.Env):
 
         # get observation form robot and world
         robot_observation, robot_obs_lim = self._robot.get_observation()
-        world_observation, world_obs_lim = self._world.get_observation()
 
         if self._control_eu_or_quat is 0:
             r_quat = p.getQuaternionFromEuler(robot_observation[3:6])
-            w_quat = p.getQuaternionFromEuler(world_observation[3:6])
         else:
             r_quat = robot_observation[3:7]
-            w_quat = world_observation[3:7]
 
         self._observation.extend(list(robot_observation))
         observation_lim.extend(robot_obs_lim)
@@ -254,7 +272,6 @@ class iCubReachResidualGymEnv(gym.Env):
         observation_lim.extend([[-1, 1], [-1, 1], [-1, 1],
                                 [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi],
                                 [-2*m.pi, 2*m.pi]])
-
 
         # get superquadric params of dimension and shape
         if self._use_superq:
@@ -301,6 +318,13 @@ class iCubReachResidualGymEnv(gym.Env):
                 observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
 
         else:
+            world_observation, world_obs_lim = self._world.get_observation()
+
+            if self._control_eu_or_quat is 0:
+                w_quat = p.getQuaternionFromEuler(world_observation[3:6])
+            else:
+                w_quat = world_observation[3:7]
+
             self._observation.extend(list(world_observation))
             observation_lim.extend(world_obs_lim)
 
@@ -349,15 +373,11 @@ class iCubReachResidualGymEnv(gym.Env):
                 quat_action[3] = 1
 
         # get action from base controller
-        robot_obs, _ = self._robot.get_observation()
-        world_obs, _ = self._world.get_observation()
-
         last_approach_step = False
         if self._base_controller.is_last_approach_step():
             last_approach_step = True
 
-        base_action, done = self._base_controller.get_next_action(robot_obs, world_obs)
-        print("base action {}".format(base_action))
+        base_action, done = self._base_controller.get_next_action()
         
         final_action_pos = np.add(base_action[0], pos_action)
 
@@ -367,14 +387,19 @@ class iCubReachResidualGymEnv(gym.Env):
 
         for _ in range(self._action_repeat):
             p.stepSimulation()
-            time.sleep(self._time_step)
-            if self._termination():
+            if self._renders:
+                time.sleep(self._time_step)
+
+            w_obs, _ = self._world.get_observation()
+            if self._termination(w_obs):
                 break
 
             self._env_step_counter += 1
 
         if last_approach_step:
-            print("!! last step, continue with grasp and lift from base controller")
+            # print("!! last step, continue with grasp and lift from base controller")
+
+            '''  # position control 
             grasp_steps = [i / 20 for i in range(0, 21, 1)]
 
             for i in grasp_steps:
@@ -387,8 +412,37 @@ class iCubReachResidualGymEnv(gym.Env):
                     time.sleep(self._time_step)
                 if self._termination():
                     break
-
+                self._robot.check_contact_fingertips(self._world.obj_id)
             self._robot.grasp(i)
+            '''
+            # velocity control
+            self._robot.grasp(0)
+            ct_forces = np.zeros(5)
+            n_step = 20
+            for _ in range(0, n_step):
+                for _ in range(0, 10):
+                    p.stepSimulation()
+                    _, curr_forces = self._robot.check_contact_fingertips(self._world.obj_id)
+                    ct_forces = np.add(ct_forces, curr_forces)
+                ct_forces = np.divide(ct_forces, 10)
+                # print("ct forces {}".format(ct_forces))
+                f_big = [f for f in ct_forces if f>=15.]
+                if len(f_big)>=3:
+                    self._robot.stop_grasp()
+                    # print("stop grasp motion")
+                    p.stepSimulation()
+                    if self._renders:
+                        time.sleep(self._time_step)
+                    break
+
+            final_action_pos[2] += 0.1
+            self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
+
+            for _ in range(int(self._action_repeat/2)):
+                p.stepSimulation()
+                if self._renders:
+                    time.sleep(self._time_step)
+
             final_action_pos[2] += 0.1
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
 
@@ -396,17 +450,11 @@ class iCubReachResidualGymEnv(gym.Env):
                 p.stepSimulation()
                 time.sleep(self._time_step)
 
-            final_action_pos[2] += 0.1
-            self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
-
-            for _ in range(self._action_repeat ):
-                p.stepSimulation()
-                time.sleep(self._time_step)
-
             self._env_step_counter = self._max_steps
 
         # dump data
-        self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat.tolist()]])
+        if DO_LOGGING:
+            self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat.tolist()]])
 
         return final_action_pos.tolist() + final_action_quat.tolist()
 
@@ -417,11 +465,14 @@ class iCubReachResidualGymEnv(gym.Env):
 
         obs, _ = self.get_extended_observation()
 
-        done = self._termination()
-        reward = self._compute_reward()
+        w_obs, _ = self._world.get_observation()
+        r_obs, _ = self._robot.get_observation()
 
-        print("reward")
-        print(reward)
+        done = self._termination(w_obs)
+        reward = self._compute_reward(w_obs, r_obs)
+
+        # print("reward")
+        # print(reward)
 
         return obs, np.array(reward), np.array(done), {}
 
@@ -463,10 +514,7 @@ class iCubReachResidualGymEnv(gym.Env):
         rgb_array = rgb_array[:, :, :3]
         return rgb_array
 
-    def _termination(self):
-        # early termination if object falls
-        w_obs, _ = self._world.get_observation()
-
+    def _termination(self, w_obs):
         if self._control_eu_or_quat is 1:
             eu = p.getEulerFromQuaternion(w_obs[3:7])
         else:
@@ -496,7 +544,7 @@ class iCubReachResidualGymEnv(gym.Env):
 
         return np.float32(0.)
 
-    def _compute_reward(self):
+    def _compute_reward(self, w_obs, r_obs):
         c1, c2, r = np.float32(0.0), np.float32(0.0), np.float32(0.0)
 
         # cost 1: object touched
@@ -504,8 +552,6 @@ class iCubReachResidualGymEnv(gym.Env):
             c1 = np.float32(1.0)
 
         # cost 2: object falls
-        w_obs, _ = self._world.get_observation()
-
         if self._control_eu_or_quat is 1:
             eu = p.getEulerFromQuaternion(w_obs[3:7])
         else:
@@ -515,8 +561,6 @@ class iCubReachResidualGymEnv(gym.Env):
             c2 = np.float32(10.0)
 
         # rew 1: distance between hand and grasp pose
-        r_obs, _ = self._robot.get_observation()
-        # Compute distance between goal and the achieved goal.
         d = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
         if d <= self._distance_threshold:
             r += np.float32(10.0)
