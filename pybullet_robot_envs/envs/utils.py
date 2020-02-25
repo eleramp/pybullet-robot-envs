@@ -234,9 +234,3 @@ def plot_contact_normal_forces(filename):
     plt.text(-3.5, 150, 'Force (N)', ha='center', va='center', rotation='vertical')
 
     plt.show()
-
-
-#file_1 = '/home/erampone/workspace/phd/robot-agents/log_successful_grasp.bin'
-file_2 = '/home/erampone/workspace/phd/robot-agents/log_successful_grasp_ct.bin'
-
-plot_contact_normal_forces(file_2)
