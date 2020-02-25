@@ -178,22 +178,115 @@ class iCubHandsEnv(iCubEnv):
         p.resetJointState(self.robot_id, idx, 1.57)
         p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=1.57, force=50)
 
+    def stop_grasp(self):
+        # close fingers
+        if self._control_arm is 'l':
+            idx_thumb = self._indices_left_hand[-4]
+            idx_fingers = self._indices_left_hand
+        else:
+            idx_thumb = self._indices_right_hand[-4]
+            idx_fingers = self._indices_right_hand
+
+        p.setJointMotorControlArray(self.robot_id, idx_fingers, p.VELOCITY_CONTROL, targetVelocities=[0] * len(idx_fingers),
+                                    forces=[500] * len(idx_fingers))
+
+        p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
+
+
     def grasp(self, step):
         # close fingers
         if self._control_arm is 'l':
             idx_thumb = self._indices_left_hand[-4]
+            idx_fingers = self._indices_left_hand
         else:
             idx_thumb = self._indices_right_hand[-4]
+            idx_fingers = self._indices_right_hand
 
-        joint_states = p.getJointStates(self.robot_id, self._motor_idxs[-20:])
-        joint_poses = [x[0] for x in joint_states]
-        p.setJointMotorControlArray(self.robot_id, self._motor_idxs[-20:], p.POSITION_CONTROL, targetPositions=joint_poses,
-                                    forces=[50] * len(self._motor_idxs[-20:]))
+        #joint_states = p.getJointStates(self.robot_id, self._motor_idxs[-20:])
+        #joint_poses = [x[0] for x in joint_states]
+        #p.setJointMotorControlArray(self.robot_id, self._motor_idxs[-20:], p.POSITION_CONTROL, targetPositions=joint_poses,
+        #                            forces=[50] * len(self._motor_idxs[-20:]))
 
-        next_pos = np.multiply(self._grasp_pos, step)
-        p.setJointMotorControlArray(self.robot_id, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
-                                    forces=[500] * len(range(52, 72)))
-        p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
+        if 0:
+            next_pos = np.multiply(self._grasp_pos, step)
+            p.setJointMotorControlArray(self.robot_id, idx_fingers, p.POSITION_CONTROL, targetPositions=next_pos,
+                                        forces=[500] * len(idx_fingers))
+            p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
+
+        else:
+            vel = [0, 1, 1, 1.2, 0, 1, 1, 1.2, 0, 1, 1, 1.2, 0, 1, 1, 1.2, 1.57, 1.5, 1.1, 1.1]
+
+            p.setJointMotorControlArray(self.robot_id, idx_fingers, p.VELOCITY_CONTROL, targetVelocities=vel,
+                                        forces=[500] * len(idx_fingers))
+
+            p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
+
+    def check_contact_fingertips(self, obj_id):
+        # finger tips
+        tips_idxs = [3, 7, 11, 15, 19]
+        if self._control_arm is 'l':
+            finger_idxs = self._indices_left_hand
+        else:
+            finger_idxs = self._indices_right_hand
+
+        p0 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=finger_idxs[tips_idxs[0]])
+        p1 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=finger_idxs[tips_idxs[1]])
+        p2 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=finger_idxs[tips_idxs[2]])
+        p3 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=finger_idxs[tips_idxs[3]])
+        p4 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=finger_idxs[tips_idxs[4]])
+
+        fingers_in_contact = 0
+
+        p0_f, p0_fr_1, p0_fr_2 = 0, 0, 0
+        if len(p0) > 0:
+            fingers_in_contact += 1
+            #print("p0! {}".format(len(p0)))
+            for pp in p0:
+                p0_f += pp[9]
+                p0_fr_1 += pp[10]
+                p0_fr_2 += pp[12]
+            p0_f /= len(p0)
+            p0_fr_1 /= len(p0)
+            p0_fr_2 /= len(p0)
+            #print("\t\t p0 normal force! {} {} {}".format(p0_f, p0_fr_1, p0_fr_2))
+
+        p1_f = 0
+        if len(p1) > 0:
+            fingers_in_contact += 1
+            #print("p1! {}".format(len(p1)))
+            for pp in p1:
+                p1_f += pp[9]
+            p1_f /= len(p1)
+            #print("\t\t p1 normal force! {}".format(p1_f))
+
+        p2_f = 0
+        if len(p2) > 0:
+            fingers_in_contact += 1
+            #print("p2! {}".format(len(p2)))
+            for pp in p2:
+                p2_f += pp[9]
+            p2_f /= len(p2)
+            #print("\t\t p2 normal force! {}".format(p2_f))
+
+        p3_f = 0
+        if len(p3) > 0:
+            fingers_in_contact += 1
+            #print("p3! {}".format(len(p3)))
+            for pp in p3:
+                p3_f += pp[9]
+            p3_f /= len(p3)
+            #print("\t\t p3 normal force! {}".format(p3_f))
+
+        p4_f = 0
+        if len(p4) > 0:
+            fingers_in_contact += 1
+            #print("p4! {}".format(len(p4)))
+            for pp in p4:
+                p4_f += pp[9]
+            p4_f /= len(p4)
+           # print("\t\t p4 normal force! {}".format(p4_f))
+
+        return fingers_in_contact, [p0_f, p1_f, p2_f, p3_f, p4_f]
 
     def checkContacts(self, obj_id):
         points = p.getContactPoints(self.robot_id, obj_id)
@@ -204,35 +297,3 @@ class iCubHandsEnv(iCubEnv):
 
         return False
 
-    def check_contact_fingertips(self, obj_id):
-        # finger tips
-        tips_idxs = [3, 7, 11, 15, 19]
-        if self._control_arm is 'l':
-            finger_idxs = self._indices_left_hand
-        else:
-            finger_idxs = self._indices_right_hand
-
-        p0 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[0]])
-        p1 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[1]])
-        p2 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[2]])
-        p3 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[3]])
-        p4 = p.getContactPoints(self.robot_id, obj_id, linkIndexA=finger_idxs[tips_idxs[4]])
-
-        fingers_in_contact = 0
-        if len(p0) > 0:
-            fingers_in_contact += 1
-            print("p0! {}".format(len(p0)))
-        if len(p1) > 0:
-            fingers_in_contact += 1
-            print("p1! {}".format(len(p1)))
-        if len(p2) > 0:
-            fingers_in_contact += 1
-            print("p2! {}".format(len(p2)))
-        if len(p3) > 0:
-            fingers_in_contact += 1
-            print("p3! {}".format(len(p3)))
-        if len(p4) > 0:
-            fingers_in_contact += 1
-            print("p4! {}".format(len(p4)))
-
-        return fingers_in_contact
