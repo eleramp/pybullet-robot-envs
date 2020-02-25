@@ -55,8 +55,13 @@ class iCubHandsEnv(iCubEnv):
 
         self.robot_id = None
 
-        # Initialize base class
-        # super().__init__(use_IK=0, control_arm='l', control_orientation=0)
+        # set initial hand pose
+        if self._control_arm == 'l':
+            self._home_hand_pose = [0.2, 0.26, 0.85, 0, 0, m.pi / 2]  # x,y,z, roll,pitch,yaw
+            self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, m.pi]]
+        else:
+            self._home_hand_pose = [0.2, -0.26, 0.85, 0, 0, m.pi / 2]
+            self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, m.pi]]
 
         self.reset()
 
@@ -106,7 +111,8 @@ class iCubHandsEnv(iCubEnv):
         self._motor_idxs = [i for i in self._indices_torso] + [j for j in control_arm_indices]
         self._end_eff_idx = self._indices_left_arm[-1] if self._control_arm == 'l' else self._indices_right_arm[-1]
 
-        self._joints_to_block = list(self._indices_left_arm) if self._control_arm == 'r' else list(self._indices_right_arm)
+        self._joints_to_block = list(self._indices_left_arm) if self._control_arm == 'r' else list(
+            self._indices_right_arm)
         self._joints_to_block += list(self._indices_left_hand) + list(self._indices_right_hand)
 
         self._home_motor_pose = self._home_pos_torso + control_arm_poses
@@ -120,14 +126,6 @@ class iCubHandsEnv(iCubEnv):
             jointInfo = p.getJointInfo(self.robot_id, i)
             if jointInfo[3] > -1:
                 self._motor_names.append(str(jointInfo[1]))
-
-        # set initial hand pose
-        if self._control_arm == 'l':
-            self._home_hand_pose = [0.2, 0.26, 0.85, 0, 0, m.pi/2]  # x,y,z, roll,pitch,yaw
-            self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [0, m.pi]]
-        else:
-            self._home_hand_pose = [0.2, -0.26, 0.85, 0, 0, m.pi/2]
-            self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, m.pi]]
 
         # self.eu_lim[0] = np.add(self.eu_lim[0], self.home_hand_pose[3])
         # self.eu_lim[1] = np.add(self.eu_lim[1], self.home_hand_pose[4])
@@ -237,18 +235,14 @@ class iCubHandsEnv(iCubEnv):
 
         fingers_in_contact = 0
 
-        p0_f, p0_fr_1, p0_fr_2 = 0, 0, 0
+        p0_f = 0
         if len(p0) > 0:
             fingers_in_contact += 1
             #print("p0! {}".format(len(p0)))
             for pp in p0:
                 p0_f += pp[9]
-                p0_fr_1 += pp[10]
-                p0_fr_2 += pp[12]
             p0_f /= len(p0)
-            p0_fr_1 /= len(p0)
-            p0_fr_2 /= len(p0)
-            #print("\t\t p0 normal force! {} {} {}".format(p0_f, p0_fr_1, p0_fr_2))
+            #print("\t\t p0 normal force! {}".format(p0_f))
 
         p1_f = 0
         if len(p1) > 0:

@@ -169,7 +169,7 @@ class SuperqGraspPlanner:
         if points.size() >= cfg.sq_model['minimum_points']:
             self._pointcloud.setPoints(points)
             self._pointcloud.setColors(colors)
-            print("new point cloud with {} points".format(self._pointcloud.getNumberPoints()))
+            # print("new point cloud with {} points".format(self._pointcloud.getNumberPoints()))
             if self._render:
                 self._visualizer.addPoints(self._pointcloud, False)
 
@@ -256,7 +256,7 @@ class SuperqGraspPlanner:
         if self._grasping_hand is 'r':
             w_icub_T_gp_py = p.multiplyTransforms(pos_gp_icub, quat_gp_icub,
                                                   (0, 0, 0), p.getQuaternionFromEuler(self._icub_hand_right_orn))
-        elif self._grasping_hand is 'l':
+        else:
             w_icub_T_gp_py = p.multiplyTransforms(pos_gp_icub, quat_gp_icub,
                                                   (0, 0, 0), p.getQuaternionFromEuler(self._icub_hand_left_orn))
 
@@ -316,7 +316,7 @@ class SuperqGraspPlanner:
 
         i_path = [1 if n_pt == 0 else i / n_pt for i in range(0, n_pt + 1)]
 
-        for idx in i_path[-7:]:
+        for idx in i_path[-8:]:
 
             # --- Position --- #
             delta_pos = idx * np.array(sp_P_gp[0])
@@ -342,7 +342,7 @@ class SuperqGraspPlanner:
 
         return False
 
-    def get_next_action(self, robot_obs, world_obs, atol=1e-2):
+    def get_next_action(self, robot_obs=None, world_obs=None, atol=1e-2):
         """
         State machine that returnes the next action to apply to the robot's hand, based on the current state of the system
 
@@ -351,26 +351,25 @@ class SuperqGraspPlanner:
         action : [np.array([float]*3), np.array([float]*3), np.array([float])] - (delta_pos + delta_euler + open/close fingers)
         """
 
-        hand_pose = robot_obs[:6]
         tg_h_obj = 0.9
 
         done = False
 
         # Approach the object
         if self._approach_path:
-            print("APPROACH")
+            # print("APPROACH")
             next_pose = self._approach_path.pop()
             self._action = [np.array(next_pose[0]), np.array(next_pose[1]), np.array([-1])]
             return self._action, done
 
         # Grasp the object
         if not self._hand_closed(robot_obs[-20:]):
-            print("GRASP")
+            # print("GRASP")
             self._action = [self._action[0], self._action[1], np.array([1])]
             return self._action, done
 
         # Lift the object
-        print("LIFT")
+        # print("LIFT")
         done = True
         action = self._action
         action[0][2] = tg_h_obj
