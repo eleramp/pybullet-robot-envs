@@ -106,7 +106,7 @@ class iCubPushGymEnv(gym.Env):
         if self._discrete_action:
             action_space = spaces.Discrete(action_dim*2+1)
         else:
-            action_bound = 0.005
+            action_bound = 1
             action_high = np.array([action_bound] * action_dim)
             action_space = spaces.Box(-action_high, action_high, dtype='float32')
 
@@ -200,6 +200,7 @@ class iCubPushGymEnv(gym.Env):
 
         # set new action
         action = np.clip(action, self.action_space.low, self.action_space.high)
+        action *= 0.005
         for _ in range(self._action_repeat):
             robot_obs, _ = self._robot.get_observation()
 
