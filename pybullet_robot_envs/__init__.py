@@ -17,7 +17,7 @@ register(
         id='iCubPush-v0',
         entry_point='pybullet_robot_envs.envs:iCubPushGymEnv',
         max_episode_steps=1000,
-        kwargs={'useIK': 1,
+        kwargs={'use_IK': 1,
                 'discrete_action': 0,
                 'control_arm': 'l',
                 'control_orientation': 1,
@@ -34,7 +34,7 @@ register(
                  'discrete_action': 0,
                  'control_arm': 'r',
                  'control_orientation': 1,
-                 'obj_pose_rnd_std': 0.0,
+                 'obj_pose_rnd_std': 0.05,
                  'max_steps': 1000},
 )
 
