@@ -60,6 +60,7 @@ register(
                 'use_superq': 1,
                 'max_steps': 1000,
                 'n_control_pt': 4,
+                'r_weights': [-5, -10, 10],
                 'renders': False},
 )
 # during the grasp execution, the hand pose can be changed by the RL agent
