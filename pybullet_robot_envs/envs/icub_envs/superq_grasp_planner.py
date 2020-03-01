@@ -26,9 +26,12 @@ class SuperqGraspPlanner:
         self._noise_pcl = noise_pcl
         self._robot_base_pose = robot_base_pose
         # offset between icub hand's ref.frame in PyBullet and on the real robot --> TODO: make it less hard coded
+        #self._icub_hand_right_orn = [-m.pi/2, 0.0, m.pi] # for icub model without fingers
+        #self._icub_hand_left_orn = [m.pi/2, 0.0, 0.0]
         self._icub_hand_right_orn = [0.0, -m.pi/2, m.pi/2]
         self._icub_hand_left_orn = [0.0, -m.pi/2, m.pi/2]
         self._starting_pose = []
+        self._n_control_pt = 2
         self._best_grasp_pose = []
         self._grasp_fingers_pose = grasp_fingers_pose
         self._approach_path = []
@@ -49,9 +52,10 @@ class SuperqGraspPlanner:
         # initialize
         self.reset(self._icub_id, self._obj_id)
 
-    def reset(self, robot_id, obj_id, starting_pose=np.array(np.zeros(6))):
+    def reset(self, robot_id, obj_id, starting_pose=np.array(np.zeros(6)), n_control_pt=2):
 
         self._starting_pose = starting_pose
+        self._n_control_pt = n_control_pt
         self._best_grasp_pose = []
         self._approach_path = []
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
@@ -311,12 +315,12 @@ class SuperqGraspPlanner:
         # linear path from initial to grasping pose
         dist_object = np.linalg.norm(sp_P_gp[0])
         # fixed distance among way-points
-        dist_intra_path_points = 0.02
+        dist_intra_path_points = 8 / self._n_control_pt * 0.01
         n_pt = int(dist_object / dist_intra_path_points)
 
         i_path = [1 if n_pt == 0 else i / n_pt for i in range(0, n_pt + 1)]
 
-        for idx in i_path[-8:]:
+        for idx in i_path[-(self._n_control_pt+1):]:
 
             # --- Position --- #
             delta_pos = idx * np.array(sp_P_gp[0])
@@ -372,7 +376,7 @@ class SuperqGraspPlanner:
         # print("LIFT")
         done = True
         action = self._action
-        action[0][2] = tg_h_obj
+        #action[0][2] = tg_h_obj
         action = [action[0], action[1], np.array([0])]
         return action, done
 
@@ -426,7 +430,13 @@ class SuperqGraspPlanner:
 
     def _debug_gui(self, points):
         for pt in points:
-            pose = pt[0]
-            p.addUserDebugLine([pose[0], pose[1], pose[2]], [pose[0] + 0.1, pose[1], pose[2]], [1, 0, 0], lifeTime=0)
-            p.addUserDebugLine([pose[0], pose[1], pose[2]], [pose[0], pose[1] + 0.1, pose[2]], [0, 1, 0], lifeTime=0)
-            p.addUserDebugLine([pose[0], pose[1], pose[2]], [pose[0], pose[1], pose[2] + 0.1], [0, 0, 1], lifeTime=0)
+            matrix = p.getMatrixFromQuaternion(pt[1])
+            dcm = np.array([matrix[0:3], matrix[3:6], matrix[6:9]])
+            np_pose = np.array(list(pt[0]))
+            pax = np_pose + np.array(list(dcm.dot([0.1, 0, 0])))
+            pay = np_pose + np.array(list(dcm.dot([0, 0.1, 0])))
+            paz = np_pose + np.array(list(dcm.dot([0, 0, 0.1])))
+
+            p.addUserDebugLine(pt[0], pax.tolist(), [1, 0, 0], lifeTime=0)
+            p.addUserDebugLine(pt[0], pay.tolist(), [0, 1, 0], lifeTime=0)
+            p.addUserDebugLine(pt[0], paz.tolist(), [0, 0, 1], lifeTime=0)
