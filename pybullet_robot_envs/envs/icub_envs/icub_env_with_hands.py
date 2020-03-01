@@ -48,8 +48,8 @@ class iCubHandsEnv(iCubEnv):
 
         self._grasp_pos = [0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 1.57, 0.4, 0.2, 0.07]
 
-        self._workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
-        self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi, m.pi]]
+        self._workspace_lim = [[0.2, 0.5], [-0.2, 0.2], [0.5, 1.0]]
+        self._eu_lim = [[-m.pi, m.pi],[-m.pi, m.pi], [-m.pi, m.pi]]
 
         self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default
 
@@ -57,10 +57,10 @@ class iCubHandsEnv(iCubEnv):
 
         # set initial hand pose
         if self._control_arm == 'l':
-            self._home_hand_pose = [0.2, 0.26, 0.85, 0, 0, m.pi / 2]  # x,y,z, roll,pitch,yaw
-            self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, m.pi]]
+            self._home_hand_pose = [0.2, 0.2, 0.8, -m.pi, 0, -m.pi/2]   # x,y,z, roll,pitch,yaw
+            self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, -m.pi]]
         else:
-            self._home_hand_pose = [0.2, -0.26, 0.85, 0, 0, m.pi / 2]
+            self._home_hand_pose = [0.2, -0.2, 0.8, 0, 0, m.pi / 2]
             self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, m.pi]]
 
         self.reset()
@@ -99,8 +99,6 @@ class iCubHandsEnv(iCubEnv):
         for count, i in enumerate(self._indices_right_hand):
             p.resetJointState(self.robot_id, i, self._home_right_hand[count] / 180 * m.pi)
 
-        self.ll, self.ul, self.jr, self.rs = self.get_joint_ranges()
-
         # save indices of only the joints to control
         control_arm_indices = list(self._indices_left_arm) + list(self._indices_left_hand) if self._control_arm == 'l' \
             else list(self._indices_right_arm) + list(self._indices_right_hand)
@@ -127,12 +125,14 @@ class iCubHandsEnv(iCubEnv):
             if jointInfo[3] > -1:
                 self._motor_names.append(str(jointInfo[1]))
 
+        self.ll, self.ul, self.jr, self.rs, self.jd = self.get_joint_ranges()
+
         # self.eu_lim[0] = np.add(self.eu_lim[0], self.home_hand_pose[3])
         # self.eu_lim[1] = np.add(self.eu_lim[1], self.home_hand_pose[4])
         # self.eu_lim[2] = np.add(self.eu_lim[2], self.home_hand_pose[5])
 
         if self._use_IK:
-            self.apply_action(self._home_hand_pose[:3])
+            self.apply_action(self._home_hand_pose)
 
     def _com_to_link_hand_frame(self):
         if self._control_arm is 'r':
@@ -212,10 +212,15 @@ class iCubHandsEnv(iCubEnv):
             p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
 
         else:
-            vel = [0, 1, 1, 1.2, 0, 1, 1, 1.2, 0, 1, 1, 1.2, 0, 1, 1, 1.2, 1.57, 1.5, 1.1, 1.1]
+            # vel = [0, 1, 1, 1.2, 0, 1, 1, 1.2, 0, 1, 1, 1.2, 0, 1, 1, 1.2, 1.57, 1.5, 1.1, 1.1]
+            vel = [0, 0.5, 0.6, 0.6, 0, 0.5, 0.6, 0.6, 0, 0.5, 0.6, 0.6, 0, 0.5, 0.6, 0.6, 0, 0.5, 0.6, 0.6]
 
             p.setJointMotorControlArray(self.robot_id, idx_fingers, p.VELOCITY_CONTROL, targetVelocities=vel,
                                         forces=[500] * len(idx_fingers))
+
+            p.setJointMotorControlArray(self.robot_id, self._motor_idxs[:-len(idx_fingers)], p.VELOCITY_CONTROL,
+                                        targetPositions=[0] * len(self._motor_idxs[:-len(idx_fingers)]),
+                                        forces=[50] * len(self._motor_idxs[:-len(idx_fingers)]))
 
             p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
 

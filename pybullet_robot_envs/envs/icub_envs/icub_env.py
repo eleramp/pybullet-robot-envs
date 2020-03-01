@@ -13,6 +13,7 @@ import icub_model_pybullet
 import numpy as np
 import quaternion
 import math as m
+import time
 
 
 
@@ -80,8 +81,6 @@ class iCubEnv:
         for count, i in enumerate(self._indices_right_arm):
             p.resetJointState(self.robot_id, i, self._home_right_arm[count] / 180 * m.pi)
 
-        self.ll, self.ul, self.jr, self.rs = self.get_joint_ranges()
-
         # save indices of only the joints to control
         control_arm_indices = self._indices_left_arm if self._control_arm == 'l' else self._indices_right_arm
         self._motor_idxs = list(self._indices_torso) + list(control_arm_indices)
@@ -100,11 +99,13 @@ class iCubEnv:
             if jointInfo[3] > -1:
                 self._motor_names.append(str(jointInfo[1]))
 
+        self.ll, self.ul, self.jr, self.rs, self.jd = self.get_joint_ranges()
+
         # set initial hand pose
         if self._control_arm == 'l':
-            self._home_hand_pose = [0.2, 0.26, 0.8, 0, 0, 0]  # x,y,z, roll,pitch,yaw
+            self._home_hand_pose = [0.3, 0.26, 0.8, 0, 0, 0]  # x,y,z, roll,pitch,yaw
         else:
-            self._home_hand_pose = [0.2, -0.26, 0.8, 0, 0, m.pi]
+            self._home_hand_pose = [0.3, -0.26, 0.8, 0, 0, m.pi]
 
         if self._use_IK:
             self.apply_action(self._home_hand_pose)
@@ -114,7 +115,7 @@ class iCubEnv:
         p.removeBody(self.robot_id)
 
     def get_joint_ranges(self):
-        lower_limits, upper_limits, joint_ranges, rest_poses = [], [], [], []
+        lower_limits, upper_limits, joint_ranges, rest_poses, joint_dumping = [], [], [], [], []
         for i in range(self._num_joints):
             jointInfo = p.getJointInfo(self.robot_id, i)
 
@@ -127,8 +128,9 @@ class iCubEnv:
                 upper_limits.append(ul)
                 joint_ranges.append(jr)
                 rest_poses.append(rp)
+                joint_dumping.append(0.1 if i in self._motor_idxs else 100.)
 
-        return lower_limits, upper_limits, joint_ranges, rest_poses
+        return lower_limits, upper_limits, joint_ranges, rest_poses, joint_dumping
 
     def get_ws_lim(self):
         return self._workspace_lim
@@ -282,8 +284,9 @@ class iCubEnv:
             # compute joint positions with IK
             jointPoses = p.calculateInverseKinematics(self.robot_id, self._end_eff_idx,
                                                       link_hand_pose[0], link_hand_pose[1],
-                                                      lowerLimits=self.ll, upperLimits=self.ul,
-                                                      jointRanges=self.jr, restPoses=self.rs)
+                                                      jointDamping=self.jd,
+                                                      maxNumIterations=100,
+                                                      residualThreshold=.001)
 
             # workaround to block joints of not-controlled arm
 
@@ -303,7 +306,9 @@ class iCubEnv:
                                                 jointIndex=i,
                                                 controlMode=p.POSITION_CONTROL,
                                                 targetPosition=jointPoses[i],
-                                                force=50)
+                                                targetVelocity=0,
+                                                force=500)
+
             else:
                 # reset the joint state (ignoring all dynamics, not recommended to use during simulation)
                 for i in range(self._num_joints):
