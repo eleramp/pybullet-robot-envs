@@ -1,3 +1,7 @@
+# Copyright (C) 2019 Istituto Italiano di Tecnologia (IIT)
+# This software may be modified and distributed under the terms of the
+# LGPL-2.1+ license. See the accompanying LICENSE file for details.
+
 #!/usr/bin/env python
 import os, inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -24,8 +28,9 @@ import numpy as np
 
 def main(args):
     eu_or_quat = 0
-    env = iCubReachGymEnv(renders=True, control_arm='r', obj_pose_rnd_std=0.07,
+    env = iCubReachResidualGymEnv(renders=True, control_arm='r', obj_pose_rnd_std=0.05, noise_pcl=0.00,
                                       control_eu_or_quat=eu_or_quat)
+
     env.seed(1)
     motorsIds = []
 

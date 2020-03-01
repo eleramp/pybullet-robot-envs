@@ -115,7 +115,7 @@ class WorldFetchEnv:
         x_min = self._ws_lim[0][0] + 0.064668
         x_max = self._ws_lim[0][1] - 0.05
 
-        px = x_min + 0.5 * (x_max - x_min)
+        px = x_min + 0.4 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.5 * (self._ws_lim[1][1] - self._ws_lim[1][0])
         pz = self._h_table+0.06
         quat = p.getQuaternionFromEuler([0.0, 0.0, 2/3*m.pi])

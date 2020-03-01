@@ -2,13 +2,17 @@
 # This software may be modified and distributed under the terms of the
 # LGPL-2.1+ license. See the accompanying LICENSE file for details.
 
+#!/usr/bin/env python
 import os, inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-print(currentdir)
 parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
+os.sys.path.insert(0, '/home/erampone/workspace/INSTALL/lib/superquadriclib/bindings')
+
+print(os.sys.path)
 
 from pybullet_robot_envs.envs.icub_envs.icub_push_gym_env import iCubPushGymEnv
+from pybullet_robot_envs.envs.icub_envs.icub_push_gym_goal_env import iCubPushGymGoalEnv
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -58,6 +62,7 @@ def main(args):
         state, reward, done, info = env.step(action)
         if t%100==0:
             print("reward ", reward)
+            print("done ", done)
 
 if __name__ == '__main__':
     main(parser.parse_args())
