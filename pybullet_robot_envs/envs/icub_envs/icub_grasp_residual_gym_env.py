@@ -35,7 +35,8 @@ class iCubGraspResidualGymEnv(gym.Env):
                  noise_pcl=0.00,
                  renders=False,
                  max_steps=1000,
-                 use_superq=1):
+                 use_superq=1,
+                 n_control_pt=4):
 
         self._time_step = 1. / 240.  # 4 ms
 
@@ -43,6 +44,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         self._control_orientation = control_orientation
         self._control_eu_or_quat = control_eu_or_quat
         self._action_repeat = action_repeat
+        self._n_control_pt = n_control_pt
         self._observation = []
 
         self._env_step_counter = 0
@@ -178,7 +180,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         # if self._first_call:
         self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
-                                    starting_pose=self._robot._home_hand_pose)
+                                    starting_pose=self._robot._home_hand_pose, n_control_pt=self._n_control_pt)
 
         self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
 
@@ -279,8 +281,9 @@ class iCubGraspResidualGymEnv(gym.Env):
         if self._use_superq:
             # get superquadric params
             sq_pos = [self._superqs[0].center[0][0], self._superqs[0].center[1][0], self._superqs[0].center[2][0]]
-            sq_eu = [self._superqs[0].ea[0][0], self._superqs[0].ea[1][0], self._superqs[0].ea[2][0]]
-            sq_quat = p.getQuaternionFromEuler(sq_eu)
+            sq_quat = axis_angle_to_quaternion((self._superqs[0].axisangle[0][0], self._superqs[0].axisangle[1][0],
+                                                self._superqs[0].axisangle[2][0], self._superqs[0].axisangle[3][0]))
+            sq_eu = p.getEulerFromQuaternion(sq_quat)
             sq_dim = self._superqs[0].dim
             sq_exp = self._superqs[0].exp
 
