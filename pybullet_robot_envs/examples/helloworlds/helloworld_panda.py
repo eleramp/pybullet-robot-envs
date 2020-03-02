@@ -16,6 +16,33 @@ import os
 import math as m
 
 
+def check_contact_fingertips(robot_id,  obj_id):
+	p0 = p.getContactPoints(obj_id, robot_id, linkIndexB=9)
+	p1 = p.getContactPoints(obj_id, robot_id, linkIndexB=10)
+
+	fingers_in_contact = 0
+
+	p0_f = 0
+	if len(p0) > 0:
+		fingers_in_contact += 1
+		print("p0! {}".format(len(p0)))
+		for pp in p0:
+			p0_f += pp[9]
+		p0_f /= len(p0)
+	print("\t\t p0 normal force! {}".format(p0_f))
+
+	p1_f = 0
+	if len(p1) > 0:
+		fingers_in_contact += 1
+		print("p1! {}".format(len(p1)))
+		for pp in p1:
+			p1_f += pp[9]
+		p1_f /= len(p1)
+	print("\t\t p1 normal force! {}".format(p1_f))
+
+	return fingers_in_contact, [p0_f, p1_f]
+
+
 def main():
 	# Open GUI and set pybullet_data in the path
 	p.connect(p.GUI)
@@ -40,7 +67,7 @@ def main():
 
 	# Load other objects
 	p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"), [1, 0.0, 0.0])
-	p.loadURDF(os.path.join(pybullet_data.getDataPath(), "lego/lego.urdf"), [1, 0.0, 0.8])
+	obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "lego/lego.urdf"), [1, 0.0, 0.8])
 
 	p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=pandaId,
 					   parentLinkIndex=endEffLink)
@@ -48,6 +75,13 @@ def main():
 					   parentLinkIndex=endEffLink)
 	p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=pandaId,
 					   parentLinkIndex=endEffLink)
+
+	p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=pandaId,
+					   parentLinkIndex=11)
+	p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=pandaId,
+					   parentLinkIndex=11)
+	p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=pandaId,
+					   parentLinkIndex=11)
 
 	# add debug slider
 	jointIds = []
@@ -96,6 +130,7 @@ def main():
 	for _ in range(70):
 		p.stepSimulation()
 		time.sleep(0.02)
+		check_contact_fingertips(pandaId, obj_id)
 
 	# go up
 	pos_2 = [1.2, 0.0, 1]

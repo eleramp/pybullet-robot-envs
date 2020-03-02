@@ -13,6 +13,7 @@ print(os.sys.path)
 
 from pybullet_robot_envs.envs.icub_envs.icub_reach_gym_env import iCubReachGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_env import iCubGraspResidualGymEnv
+from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_env_1 import iCubGraspResidualGymEnv1
 from pybullet_robot_envs.envs.icub_envs.icub_reach_residual_gym_env import iCubReachResidualGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_grasp_residual_gym_goal_env import iCubGraspResidualGymGoalEnv
 from pybullet_robot_envs.envs.icub_envs.icub_reach_residual_gym_goal_env import iCubReachResidualGymGoalEnv
@@ -28,7 +29,7 @@ import numpy as np
 
 def main(args):
     eu_or_quat = 0
-    env = iCubReachResidualGymEnv(renders=True, control_arm='r', obj_pose_rnd_std=0.05, noise_pcl=0.00,
+    env = iCubGraspResidualGymEnv(renders=True, control_arm='r', obj_pose_rnd_std=0.05, noise_pcl=0.005,
                                       control_eu_or_quat=eu_or_quat)
 
     env.seed(1)

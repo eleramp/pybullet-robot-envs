@@ -14,31 +14,46 @@ from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimator
 import config_superq_grasp_planner as cfg
 
 
+def get_robot_name_list():
+    robots = [
+        'icub',
+        'icub_hands',
+        'panda',
+    ]
+    return robots
+
+
+def get_real_icub_to_sim_robot():
+    robots = get_robot_name_list()
+    R = {
+        robots[0]: [[-m.pi/2, 0.0, m.pi],[m.pi/2, 0.0, 0.0]],
+        robots[1]: [[0.0, -m.pi/2, m.pi/2], [0.0, -m.pi/2, m.pi/2]],
+        robots[2]: [[0., 0., -m.pi/2], [[m.pi, 0., -m.pi/2]]]
+    }
+    return R
+
+
 class SuperqGraspPlanner:
 
-    def __init__(self, icub_id, obj_id,
+    def __init__(self, robot_id, obj_id, robot_name,
                  robot_base_pose=((0.0,) * 3, (0.0,)*4),
-                 grasping_hand='l',
+                 grasping_hand='r',
                  noise_pcl=0.02,
-                 grasp_fingers_pose=(0,)*20,
                  render=True):
 
         self._grasping_hand = grasping_hand
         self._noise_pcl = noise_pcl
         self._robot_base_pose = robot_base_pose
         # offset between icub hand's ref.frame in PyBullet and on the real robot --> TODO: make it less hard coded
-        #self._icub_hand_right_orn = [-m.pi/2, 0.0, m.pi] # for icub model without fingers
-        #self._icub_hand_left_orn = [m.pi/2, 0.0, 0.0]
-        self._icub_hand_right_orn = [0.0, -m.pi/2, m.pi/2]
-        self._icub_hand_left_orn = [0.0, -m.pi/2, m.pi/2]
+        self._real_icub_R_sim_robot = get_real_icub_to_sim_robot()[robot_name]
         self._starting_pose = []
-        self._n_control_pt = 2
+        self._n_control_pt = 1
         self._best_grasp_pose = []
-        self._grasp_fingers_pose = grasp_fingers_pose
         self._approach_path = []
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
-        self._icub_id = icub_id
+
+        self._robot_id = robot_id
         self._obj_id = obj_id
         self._render = render
 
@@ -52,7 +67,7 @@ class SuperqGraspPlanner:
 
         # initialize
         self.seed()
-        self.reset(self._icub_id, self._obj_id)
+        self.reset(self._robot_id, self._obj_id)
 
     def reset(self, robot_id, obj_id, starting_pose=np.array(np.zeros(6)), n_control_pt=2):
 
@@ -62,7 +77,7 @@ class SuperqGraspPlanner:
         self._approach_path = []
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
-        self._icub_id = robot_id
+        self._robot_id = robot_id
         self._obj_id = obj_id
 
         #self._grasping_hand = cfg.mode['control_arms']
@@ -134,7 +149,8 @@ class SuperqGraspPlanner:
         # NOTE: these transform are necessary since the superquadric-lib code consider the icub world frame as reference frame
 
         # trasform object pose from pybullet world to icub world (on the hip)
-        w_robot_T_w_py = p.invertTransform(self._robot_base_pose[0], self._robot_base_pose[1])
+        w_py_R_w_icub = p.getQuaternionFromEuler([0, 0, -m.pi])
+        w_robot_T_w_py = p.invertTransform(self._robot_base_pose[0], w_py_R_w_icub)
 
         # object wrt robot world
         w_robot_T_obj = p.multiplyTransforms(w_robot_T_w_py[0], w_robot_T_w_py[1], obj_pos, obj_quat)
@@ -169,8 +185,8 @@ class SuperqGraspPlanner:
                 points.push_back(v3)
                 colors.push_back([255, 255, 0])
                 # if i % 100 is 0:
-                #    p.addUserDebugLine(v3, [v3[0] + 0.001, v3[1], v3[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
-                #                      lifeTime=300, parentObjectUniqueId=0)
+                #     p.addUserDebugLine(v3, [v3[0] + 0.001, v3[1], v3[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
+                #                       lifeTime=300, parentObjectUniqueId=0)
 
         if points.size() >= cfg.sq_model['minimum_points']:
             self._pointcloud.setPoints(points)
@@ -230,11 +246,14 @@ class SuperqGraspPlanner:
         if np.linalg.norm((gp.position[0][0], gp.position[1][0], gp.position[2][0])) == 0.:
             return False
 
+        sq_hand = grasp_res_hand.hand_superq
+
         # visualize them
         if self._render:
             self._visualizer.resetPoses()
             self._visualizer.addPoses(grasp_res_hand.grasp_poses)
             self._visualizer.addPlane(self._grasp_estimator.getPlaneHeight())
+            self._visualizer.addSuperqHands(sq_hand)
 
         # ------> Estimate pose cost <-------- #
         # TODO: Compute pose hat
@@ -261,12 +280,13 @@ class SuperqGraspPlanner:
 
         if self._grasping_hand is 'r':
             w_icub_T_gp_py = p.multiplyTransforms(pos_gp_icub, quat_gp_icub,
-                                                  (0, 0, 0), p.getQuaternionFromEuler(self._icub_hand_right_orn))
+                                                  (0, 0, 0), p.getQuaternionFromEuler(self._real_icub_R_sim_robot[0]))
         else:
             w_icub_T_gp_py = p.multiplyTransforms(pos_gp_icub, quat_gp_icub,
-                                                  (0, 0, 0), p.getQuaternionFromEuler(self._icub_hand_left_orn))
+                                                  (0, 0, 0), p.getQuaternionFromEuler(self._real_icub_R_sim_robot[1]))
 
-        w_py_T_gp_py = p.multiplyTransforms(self._robot_base_pose[0], self._robot_base_pose[1],
+        w_py_R_w_icub = p.getQuaternionFromEuler([0, 0, -m.pi])
+        w_py_T_gp_py = p.multiplyTransforms(self._robot_base_pose[0], w_py_R_w_icub,
                                             w_icub_T_gp_py[0], w_icub_T_gp_py[1])
 
         gp_py_orn = p.getEulerFromQuaternion(w_py_T_gp_py[1])
@@ -287,7 +307,8 @@ class SuperqGraspPlanner:
             # axis angle to quaterion
             quat_sq = axis_angle_to_quaternion((s.axisangle[0][0], s.axisangle[1][0], s.axisangle[2][0], s.axisangle[3][0]))
 
-            w_py_T_sq = p.multiplyTransforms(self._robot_base_pose[0], self._robot_base_pose[1],
+            w_py_R_w_icub = p.getQuaternionFromEuler([0, 0, -m.pi])
+            w_py_T_sq = p.multiplyTransforms(self._robot_base_pose[0], w_py_R_w_icub,
                                              (s.center[0][0], s.center[1][0], s.center[2][0]), quat_sq)
 
             vec_aa_sq = quaternion_to_axis_angle(w_py_T_sq[1])
@@ -317,7 +338,7 @@ class SuperqGraspPlanner:
         # linear path from initial to grasping pose
         dist_object = np.linalg.norm(sp_P_gp[0])
         # fixed distance among way-points
-        dist_intra_path_points = 8 / self._n_control_pt * 0.01
+        dist_intra_path_points = 10 / self._n_control_pt * 0.01
         n_pt = int(dist_object / dist_intra_path_points)
 
         i_path = [1 if n_pt == 0 else i / n_pt for i in range(0, n_pt + 1)]
@@ -387,11 +408,6 @@ class SuperqGraspPlanner:
         #action[0][2] = tg_h_obj
         action = [action[0], action[1], np.array([0])]
         return action, done
-
-    def _hand_closed(self, finger_poses):
-        d = goal_distance(np.array(self._grasp_fingers_pose), np.array(finger_poses))
-        print("dist fingers {}".format(d))
-        return goal_distance(np.array(self._grasp_fingers_pose), np.array(finger_poses)) <= 0.47
 
     """
     def _next_pose(self, hand_pose):  # not used

@@ -10,3 +10,5 @@ from pybullet_robot_envs.envs.icub_envs.icub_reach_residual_gym_goal_env import 
 
 from pybullet_robot_envs.envs.panda_envs.panda_reach_gym_env import pandaReachGymEnv
 from pybullet_robot_envs.envs.panda_envs.panda_push_gym_env import pandaPushGymEnv
+from pybullet_robot_envs.envs.icub_envs.panda_reach_residual_gym_env import pandaReachResidualGymEnv
+from pybullet_robot_envs.envs.icub_envs.panda_grasp_residual_gym_env import pandaGraspResidualGymEnv

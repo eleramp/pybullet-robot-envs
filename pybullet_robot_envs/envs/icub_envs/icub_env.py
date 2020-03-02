@@ -291,8 +291,6 @@ class iCubEnv:
                                                       residualThreshold=.001)
 
             # workaround to block joints of not-controlled arm
-
-
             if self._use_simulation:
                 for i in range(self._num_joints):
                     if i in self._joints_to_block:
