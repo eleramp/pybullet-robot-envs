@@ -209,14 +209,14 @@ class iCubGraspResidualGymEnv(gym.Env):
         self._target_h_lift = world_obs[2] + 0.1
 
         # move hand to the first way point on approach trajectory
-        base_action, done = self._base_controller.get_next_action(robot_obs[:6], world_obs[:6])
-        for _ in range(10):
-            self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
-            for _ in range(10):
-                p.stepSimulation()
+        #base_action, done = self._base_controller.get_next_action(robot_obs[:6], world_obs[:6])
+        #for _ in range(10):
+        #    self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
+        #    for _ in range(10):
+        #        p.stepSimulation()
 
         self._t_grasp, self._t_lift = 0, 0
-        self._grasping_step = 20
+        self._grasping_step = 15
         self.last_approach_step = False
 
         obs, _ = self.get_extended_observation()
@@ -549,7 +549,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         # rew 1: distance between hand and grasp pose
         d = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
         if d <= self._distance_threshold:
-            r += np.float32(10.0)
+            r += np.float32(1.0)
             self._t_grasp += self._time_step * self._action_repeat
         else:
             self._t_grasp = 0
