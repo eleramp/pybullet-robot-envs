@@ -4,6 +4,7 @@ import pybullet as p
 import math as m
 import trimesh
 import superquadric_bindings
+from gym.utils import seeding
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
@@ -50,6 +51,7 @@ class SuperqGraspPlanner:
         self._gp_reached = 0
 
         # initialize
+        self.seed()
         self.reset(self._icub_id, self._obj_id)
 
     def reset(self, robot_id, obj_id, starting_pose=np.array(np.zeros(6)), n_control_pt=2):
@@ -148,7 +150,7 @@ class SuperqGraspPlanner:
 
         # Create gaussian noise to add to the points distribution
         mu, sigma = 0.0, self._noise_pcl
-        noise = np.random.normal(mu, sigma, [obj_mesh.vertices.size, 1])
+        noise = self.np_random.normal(mu, sigma, [obj_mesh.vertices.size, 1])
         #np.random.shuffle(noise)
 
         points = superquadric_bindings.deque_Vector3d()
@@ -433,6 +435,10 @@ class SuperqGraspPlanner:
     def _object_approached(self, hand_pose, obj_pose, atol): #not used
         return goal_distance(np.array(hand_pose[:3]), np.array(obj_pose[:3])) < 0.1
   """
+
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
 
     def _debug_gui(self, points):
         for pt in points:

@@ -63,6 +63,7 @@ class iCubHandsEnv(iCubEnv):
             self._home_hand_pose = [0.2, -0.2, 0.8, 0, 0, m.pi / 2]
             self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, m.pi]]
 
+        self.seed()
         self.reset()
 
     def reset(self):

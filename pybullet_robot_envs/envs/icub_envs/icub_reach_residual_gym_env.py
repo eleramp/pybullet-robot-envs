@@ -398,17 +398,13 @@ class iCubReachResidualGymEnv(gym.Env):
 
         # final_action = np.add(base_action[0].tolist() + base_action[1].tolist(), action[:6])
 
-        self._robot.apply_action(final_action_pos.tolist() + final_action_quat_1)
-
-        reward = 0
         for _ in range(self._action_repeat):
+            self._robot.apply_action(final_action_pos.tolist() + final_action_quat_1)
             p.stepSimulation()
             if self._renders:
                 time.sleep(self._time_step)
 
             w_obs, _ = self._world.get_observation()
-            r_obs, _ = self._robot.get_observation()
-            reward += self._compute_reward(w_obs, r_obs)
 
             if self._termination(w_obs):
                 break
@@ -441,6 +437,9 @@ class iCubReachResidualGymEnv(gym.Env):
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
+        self._world.seed(seed)
+        self._robot.seed(seed)
+        self._base_controller.seed(seed)
         return [seed]
 
     def render(self, mode="rgb_array"):
@@ -494,7 +493,7 @@ class iCubReachResidualGymEnv(gym.Env):
         r_obs, _ = self._robot.get_observation()
         # Compute distance between goal and the achieved goal.
         d = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
-        if d <= self._distance_threshold and self._t_grasp >= 2:
+        if d <= self._distance_threshold and self._t_grasp >= 1:
             print("SUCCESS")
             return np.float32(1.)
 
@@ -533,7 +532,7 @@ class iCubReachResidualGymEnv(gym.Env):
         else:
             self._t_grasp = 0
 
-        if d <= self._distance_threshold and self._t_grasp >= 2:
+        if d <= self._distance_threshold and self._t_grasp >= 1:
             r = np.float32(100.0)
 
         reward = r + c1 + c2

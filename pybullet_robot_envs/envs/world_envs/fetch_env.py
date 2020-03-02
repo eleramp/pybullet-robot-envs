@@ -6,6 +6,7 @@ import numpy as np
 import math as m
 import pybullet as p
 import pybullet_data
+from gym.utils import seeding
 
 
 def get_objects_list():
@@ -41,6 +42,7 @@ class WorldFetchEnv:
         self._control_eu_or_quat = control_eu_or_quat
 
         # initialize
+        self.seed()
         self.reset()
 
     def reset(self):
@@ -110,6 +112,10 @@ class WorldFetchEnv:
         p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.obj_id)
         p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.obj_id)
 
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
+
     def _sample_pose(self):
         # ws_lim = self._ws_lim
         x_min = self._ws_lim[0][0] + 0.064668
@@ -123,7 +129,7 @@ class WorldFetchEnv:
         if self._obj_pose_rnd_std > 0:
             # Add a Gaussian noise to position
             mu, sigma = 0, self._obj_pose_rnd_std
-            noise = np.random.normal(mu, sigma, 2)
+            noise = self.np_random.normal(mu, sigma, 2)
 
             px = px + noise[0]
             px = np.clip(px, x_min, x_max)
@@ -132,7 +138,7 @@ class WorldFetchEnv:
             py = np.clip(py, self._ws_lim[1][0], self._ws_lim[1][1])
 
             # Add uniform noise to yaw orientation
-            quat = p.getQuaternionFromEuler([0, 0, np.random.uniform(low=1/4*m.pi, high=3/4*m.pi)])
+            quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=1/4*m.pi, high=3/4*m.pi)])
 
         obj_pose = (px, py, pz) + quat
 

@@ -462,8 +462,10 @@ class iCubGraspResidualGymEnv(gym.Env):
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
+        self._world.seed(seed)
+        self._robot.seed(seed)
+        self._base_controller.seed(seed)
         return [seed]
-
     def render(self, mode="rgb_array"):
         if mode != "rgb_array":
             return np.array([])

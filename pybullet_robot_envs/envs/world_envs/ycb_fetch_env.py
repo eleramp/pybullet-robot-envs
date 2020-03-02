@@ -5,6 +5,7 @@ os.sys.path.insert(0, currentdir)
 import pybullet as p
 import pybullet_data
 
+
 from pybullet_robot_envs.envs.world_envs.fetch_env import WorldFetchEnv
 import ycb_objects_models_sim
 from ycb_objects_models_sim import objects
@@ -55,6 +56,7 @@ class YcbWorldFetchEnv(WorldFetchEnv):
         self._control_eu_or_quat = control_eu_or_quat
 
         # initialize
+        self.seed()
         self.reset()
 
     def reset(self):

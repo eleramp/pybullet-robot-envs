@@ -9,6 +9,7 @@ os.sys.path.insert(0, parentdir)
 
 import pybullet as p
 import icub_model_pybullet
+from gym.utils import seeding
 
 import numpy as np
 import quaternion
@@ -51,6 +52,7 @@ class iCubEnv:
         self._motor_idxs = 0
         self.ll, self.ul, self.jr, self.rs = None, None, None, None
 
+        self.seed()
         self.reset()
 
     def reset(self):
@@ -332,6 +334,10 @@ class iCubEnv:
                                         p.POSITION_CONTROL,
                                         targetPosition=new_motor_pos,
                                         force=50)
+
+    def seed(self, seed=None):
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
 
     def debug_gui(self):
 
