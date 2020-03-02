@@ -29,7 +29,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
                  control_arm='l',
                  control_orientation=1,
                  control_eu_or_quat=0,
-                 obj_name=get_ycb_objects_list()[0],
+                 obj_name=None,
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
                  renders=False,
@@ -45,6 +45,11 @@ class iCubGraspResidualGymEnv1(gym.Env):
         self._action_repeat = action_repeat
         self._n_control_pt = n_control_pt
         self._observation = []
+        if obj_name is not None:
+            self._obj_name = get_ycb_objects_list()[obj_name]
+        else:
+            self._obj_name = None
+
 
         self._env_step_counter = 0
         self._renders = renders
@@ -84,6 +89,10 @@ class iCubGraspResidualGymEnv1(gym.Env):
                                    control_eu_or_quat=self._control_eu_or_quat)
 
         # Load world environment
+        if self._obj_name is None:
+            obj_name = get_ycb_objects_list()[0]
+        else:
+            obj_name = self._obj_name
         self._world = YcbWorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                        workspace_lim=self._robot._workspace_lim,
                                        control_eu_or_quat=self._control_eu_or_quat)
@@ -127,8 +136,8 @@ class iCubGraspResidualGymEnv1(gym.Env):
         # Configure action space
         action_dim = self._robot.get_action_dim()
         action_bound = 1
-        action_high = np.array([0.08, 0.08, 0.08, 0.785, 0.2, 1])
-        action_low = np.array([-0.08, -0.08, -0.08, -0.785, -0.2, -1])
+        action_high = np.array([0.03, 0.03, 0.03, 0.785, 0.2, 1])
+        action_low = np.array([-0.03, -0.03, -0.03, -0.785, -0.2, -1])
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
@@ -165,9 +174,10 @@ class iCubGraspResidualGymEnv1(gym.Env):
 
         self._robot.pre_grasp()
 
-        obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
-        self._world._obj_name = obj_name
-        print("obj_name {}".format(obj_name))
+        if self._obj_name is None:
+            obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
+            self._world._obj_name = obj_name
+            print("obj_name {}".format(obj_name))
 
         self._world.reset()
         # Let the world run for a bit
@@ -552,7 +562,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
 
         # cost 1: object touched
         if self._world.check_contact(self._robot.robot_id):
-            c1 = np.float32(1.0)
+            c1 = np.float32(2.0)
 
         # cost 2: object falls
         if self._control_eu_or_quat is 1:

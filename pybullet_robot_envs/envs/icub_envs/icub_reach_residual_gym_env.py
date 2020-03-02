@@ -29,7 +29,7 @@ class iCubReachResidualGymEnv(gym.Env):
                  control_arm='l',
                  control_orientation=1,
                  control_eu_or_quat=0,
-                 obj_name=get_ycb_objects_list()[0],
+                 obj_name=None,
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
                  renders=False,
@@ -48,6 +48,11 @@ class iCubReachResidualGymEnv(gym.Env):
         self._observation = []
         self._r_weights = r_weights
 
+        if obj_name is not None:
+            self._obj_name = get_ycb_objects_list()[obj_name]
+        else:
+            self._obj_name = None
+
         self._env_step_counter = 0
         self._renders = renders
         self._max_steps = max_steps
@@ -58,6 +63,8 @@ class iCubReachResidualGymEnv(gym.Env):
         self._use_superq = use_superq
         self._distance_threshold = 0.03
 
+        self._log_file = []
+        self._log_file_path = []
         if DO_LOGGING:
             self._log_file_path.append(os.path.join(log_file, 'nominal.txt'))
             self._log_file_path.append(os.path.join(log_file, 'learned.txt'))
@@ -83,6 +90,10 @@ class iCubReachResidualGymEnv(gym.Env):
                                    control_eu_or_quat=self._control_eu_or_quat)
 
         # Load world environment
+        if self._obj_name is None:
+            obj_name = get_ycb_objects_list()[0]
+        else:
+            obj_name = self._obj_name
         self._world = YcbWorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                        workspace_lim=self._robot._workspace_lim,
                                        control_eu_or_quat=self._control_eu_or_quat)
@@ -123,8 +134,8 @@ class iCubReachResidualGymEnv(gym.Env):
         # Configure action space
         action_dim = self._robot.get_action_dim()
         action_bound = 1
-        action_high = np.array([0.08, 0.08, 0.08, 0.785, 0.2, 1])
-        action_low = np.array([-0.08, -0.08, -0.08, -0.785, -0.2, -1])
+        action_high = np.array([0.03, 0.03, 0.03, 0.785, 0.2, 1])
+        action_low = np.array([-0.03, -0.03, -0.03, -0.785, -0.2, -1])
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
@@ -162,9 +173,10 @@ class iCubReachResidualGymEnv(gym.Env):
 
         self._robot.pre_grasp()
 
-        obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
-        self._world._obj_name = obj_name
-        print("obj_name {}".format(obj_name))
+        if self._obj_name is None:
+            obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
+            self._world._obj_name = obj_name
+            print("obj_name {}".format(obj_name))
 
         self._world.reset()
         # Let the world run for a bit
@@ -250,7 +262,7 @@ class iCubReachResidualGymEnv(gym.Env):
         print("grasp pose: {}".format(self._grasp_pose))
 
         if self._renders:
-            self._base_controller._visualizer.render()
+            self._base_controller._visualizer.visualize()
 
     def get_extended_observation(self):
         self._observation = []
@@ -482,7 +494,7 @@ class iCubReachResidualGymEnv(gym.Env):
         r_obs, _ = self._robot.get_observation()
         # Compute distance between goal and the achieved goal.
         d = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
-        if d <= self._distance_threshold and self._t_grasp >= 1:
+        if d <= self._distance_threshold and self._t_grasp >= 2:
             print("SUCCESS")
             return np.float32(1.)
 
@@ -521,7 +533,7 @@ class iCubReachResidualGymEnv(gym.Env):
         else:
             self._t_grasp = 0
 
-        if d <= self._distance_threshold and self._t_grasp >= 1:
+        if d <= self._distance_threshold and self._t_grasp >= 2:
             r = np.float32(100.0)
 
         reward = r + c1 + c2
