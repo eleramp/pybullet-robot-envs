@@ -13,7 +13,7 @@ from ycb_objects_models_sim import objects
 def get_ycb_objects_list():
     obj_list = [
         'YcbMustardBottle',
-        'YcbChipsCan',
+        'YcbTomatoSoupCan',
         'YcbCrackerBox',
         'YcbBanana',
         'YcbFoamBrick',
@@ -27,7 +27,7 @@ def get_ycb_objects_list():
         'YcbScissors',
         'YcbStrawberry',
         'YcbTennisBall',
-        'YcbTomatoSoupCan',
+        'YcbChipsCan',
     ]
 
     return obj_list
