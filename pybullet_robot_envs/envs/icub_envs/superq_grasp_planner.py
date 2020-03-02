@@ -148,8 +148,8 @@ class SuperqGraspPlanner:
 
         # Create gaussian noise to add to the points distribution
         mu, sigma = 0.0, self._noise_pcl
-        noise = np.random.normal(mu, sigma, [obj_mesh.vertices.size, 3])
-        np.random.shuffle(noise)
+        noise = np.random.normal(mu, sigma, [obj_mesh.vertices.size, 1])
+        #np.random.shuffle(noise)
 
         points = superquadric_bindings.deque_Vector3d()
         colors = superquadric_bindings.vector_vector_uchar()
@@ -162,7 +162,7 @@ class SuperqGraspPlanner:
             # sample only points visible to the robot eyes, to simulate partial observability of the object
             if sph_vec[1] <= m.pi/6 or -m.pi/2 <= sph_vec[2] <= m.pi/2:
                 v3 = v2 + w_robot_T_obj[0]
-                v3 += noise[i]
+                v3[0] += noise[i]
 
                 points.push_back(v3)
                 colors.push_back([255, 255, 0])
@@ -342,6 +342,12 @@ class SuperqGraspPlanner:
 
     def is_last_approach_step(self):
         if len(self._approach_path) == 1:
+            return True
+
+        return False
+
+    def is_approach_path_empty(self):
+        if len(self._approach_path) == 0:
             return True
 
         return False
