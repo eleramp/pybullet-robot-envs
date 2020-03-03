@@ -155,7 +155,7 @@ register(
 
 register(
         id='pandaReachResidual-v0',
-        entry_point='pybullet_robot_envs.envs:pandaReachResidualGymEnv',
+        entry_point='pybullet_robot_envs.envs:PandaReachResidualGymEnv',
         max_episode_steps=1000,
         kwargs={'control_arm': 'r',
                 'control_orientation': 1,
@@ -171,7 +171,7 @@ register(
 # during the grasp execution, the hand pose can be changed by the RL agent
 register(
         id='pandaGraspResidual-v0',
-        entry_point='pybullet_robot_envs.envs:pandaGraspResidualGymEnv',
+        entry_point='pybullet_robot_envs.envs:PandaGraspResidualGymEnv',
         max_episode_steps=1000,
         kwargs={'control_arm': 'r',
                 'control_orientation': 1,
