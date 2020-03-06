@@ -139,8 +139,8 @@ class iCubGraspResidualGymEnv(gym.Env):
         # Configure action space
         action_dim = self._robot.get_action_dim()
         action_bound = 1
-        action_high = np.array([0.03, 0.03, 0.03, 0.785, 0.2, 1])
-        action_low = np.array([-0.03, -0.03, -0.03, -0.785, -0.2, -1])
+        action_high = np.array([0.05, 0.05, 0.05, 0.785, 0.2, 1])
+        action_low = np.array([-0.05, -0.05, -0.05, -0.785, -0.2, -1])
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
@@ -551,11 +551,6 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         # if d <= self._distance_threshold and self._t_grasp >= 1:
         #     r = np.float32(100.0)
-
-        # reward: when object lifted of target_h_object for > 3 secs
-        if self._object_lifted(w_obs[2], self._target_h_lift, atol=0.1):
-            r += np.float32(10.0)
-            c1 = 0
 
         if self._object_lifted(w_obs[2], self._target_h_lift):
             r += np.float32(100.0)
