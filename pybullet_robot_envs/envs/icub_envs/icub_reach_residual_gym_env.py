@@ -19,6 +19,7 @@ os.sys.path.insert(0, currentdir)
 
 DO_LOGGING = False
 
+
 class iCubReachResidualGymEnv(gym.Env):
     metadata = {'render.modes': ['human', 'rgb_array'],
                 'video.frames_per_second': 50}
@@ -36,7 +37,7 @@ class iCubReachResidualGymEnv(gym.Env):
                  max_steps=1000,
                  use_superq=1,
                  n_control_pt=4,
-                 r_weights=[-5,-10,10]):
+                 r_weights=(-5, -10, 10)):
 
         self._time_step = 1. / 240.  # 4 ms
 
@@ -99,7 +100,9 @@ class iCubReachResidualGymEnv(gym.Env):
                                        control_eu_or_quat=self._control_eu_or_quat)
 
         # Load base controller
-        self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id, render=self._renders,
+        self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id,
+                                                   robot_name='icub_hands',
+                                                   render=self._renders,
                                                    grasping_hand=self._control_arm,
                                                    noise_pcl=self._noise_pcl)
 

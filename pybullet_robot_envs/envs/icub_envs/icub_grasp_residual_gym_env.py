@@ -99,7 +99,9 @@ class iCubGraspResidualGymEnv(gym.Env):
                                        control_eu_or_quat=self._control_eu_or_quat)
 
         # Load base controller
-        self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id, render=self._renders,
+        self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id,
+                                                   robot_name='icub_hands',
+                                                   render=self._renders,
                                                    grasping_hand=self._control_arm,
                                                    noise_pcl=self._noise_pcl)
 

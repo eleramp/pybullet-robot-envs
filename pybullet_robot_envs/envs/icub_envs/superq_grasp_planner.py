@@ -14,21 +14,11 @@ from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimator
 import config_superq_grasp_planner as cfg
 
 
-def get_robot_name_list():
-    robots = [
-        'icub',
-        'icub_hands',
-        'panda',
-    ]
-    return robots
-
-
 def get_real_icub_to_sim_robot():
-    robots = get_robot_name_list()
     R = {
-        robots[0]: [[-m.pi/2, 0.0, m.pi],[m.pi/2, 0.0, 0.0]],
-        robots[1]: [[0.0, -m.pi/2, m.pi/2], [0.0, -m.pi/2, m.pi/2]],
-        robots[2]: [[0., 0., -m.pi/2], [[m.pi, 0., -m.pi/2]]]
+        cfg.robots[0]: [[-m.pi/2, 0.0, m.pi], [m.pi/2, 0.0, 0.0]],
+        cfg.robots[1]: [[0.0, -m.pi/2, m.pi/2], [0.0, -m.pi/2, m.pi/2]],
+        cfg.robots[2]: [[0., 0., -m.pi/2], [[m.pi, 0., -m.pi/2]]]
     }
     return R
 
@@ -47,14 +37,15 @@ class SuperqGraspPlanner:
         # offset between icub hand's ref.frame in PyBullet and on the real robot --> TODO: make it less hard coded
         self._real_icub_R_sim_robot = get_real_icub_to_sim_robot()[robot_name]
         self._starting_pose = []
-        self._n_control_pt = 1
         self._best_grasp_pose = []
         self._approach_path = []
+        self._n_control_pt = 1
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
 
         self._robot_id = robot_id
         self._obj_id = obj_id
+        self._robot_name = robot_name
         self._render = render
 
         self._pointcloud = PointCloud()
@@ -73,14 +64,14 @@ class SuperqGraspPlanner:
 
         self._starting_pose = starting_pose
         self._n_control_pt = n_control_pt
+        self._robot_id = robot_id
+        self._obj_id = obj_id
+
+        # reset variables
         self._best_grasp_pose = []
         self._approach_path = []
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
-        self._robot_id = robot_id
-        self._obj_id = obj_id
-
-        #self._grasping_hand = cfg.mode['control_arms']
 
         if self._render:
             self._visualizer.setPosition(cfg.visualizer['x'], cfg.visualizer['y'])
@@ -105,13 +96,13 @@ class SuperqGraspPlanner:
 
         # ------ Set Superquadric Grasp parameters ------ #
         self._grasp_estimator.SetIntegerValue("print_level", 0)
-        self._grasp_estimator.SetNumericValue("tol", cfg.sq_grasp['tol'])
-        self._grasp_estimator.SetIntegerValue("max_superq", cfg.sq_grasp['max_superq'])
-        self._grasp_estimator.SetNumericValue("constr_tol", cfg.sq_grasp['constr_tol'])
+        self._grasp_estimator.SetNumericValue("tol", cfg.sq_grasp[self._robot_name]['tol'])
+        self._grasp_estimator.SetIntegerValue("max_superq", cfg.sq_grasp[self._robot_name]['max_superq'])
+        self._grasp_estimator.SetNumericValue("constr_tol", cfg.sq_grasp[self._robot_name]['constr_tol'])
         self._grasp_estimator.SetStringValue("left_or_right", "right" if self._grasping_hand is 'r' else "left")
-        self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp['plane_table']))
-        self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp['displacement']))
-        self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp['hand_sq']))
+        self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp[self._robot_name]['plane_table']))
+        self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp[self._robot_name]['displacement']))
+        self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp[self._robot_name]['hand_sq']))
 
         return
 
@@ -395,12 +386,6 @@ class SuperqGraspPlanner:
             self._action = [np.array(next_pose[0]), np.array(next_pose[1]), np.array([-1])]
             return self._action, done
 
-        # Grasp the object
-        #if not self._hand_closed(robot_obs[-20:]):
-        #    # print("GRASP")
-        #    self._action = [self._action[0], self._action[1], np.array([1])]
-        #    return self._action, done
-
         # Lift the object
         # print("LIFT")
         done = True
@@ -408,49 +393,6 @@ class SuperqGraspPlanner:
         #action[0][2] = tg_h_obj
         action = [action[0], action[1], np.array([0])]
         return action, done
-
-    """
-    def _next_pose(self, hand_pose):  # not used
-        if not self._approach_path:
-            print("Approach path is empty. Can't get next way-point")
-            return [np.zeros(3), np.zeros(3), np.array([0.5])]
-
-        self._gp_reached = 0
-        # Find the nearest way-point in the approach trajectory
-        dist = 1000
-        idx = 0
-        for i, pose in enumerate(self._approach_path):
-            temp_dist = goal_distance(np.array(hand_pose[:3]), np.array(pose[0]))
-            if temp_dist < dist:
-                dist = temp_dist
-                idx = min(i+1, len(self._approach_path)-1)
-
-        if idx is len(self._approach_path)-1:
-            self._gp_reached = 1
-
-        next_pose = self._approach_path[idx]
-
-        # relative position from current hand position to next target position
-        rel_pos = np.subtract(next_pose[0], hand_pose[:3])
-
-        # quaternion of current pose
-        q_cp = p.getQuaternionFromEuler(hand_pose[3:6])
-        w_q_cp = np.quaternion(q_cp[3], q_cp[0], q_cp[1], q_cp[2])
-
-        # quaternion of next target pose
-        w_q_tp = np.quaternion(next_pose[1][3], next_pose[1][0], next_pose[1][1], next_pose[1][2])
-
-        # relative quaternion from starting to grasping pose
-        cp_q_tp = np.conj(w_q_cp) * w_q_tp
-        cp_q_tp = quaternion.as_float_array(cp_q_tp)
-        cp_eu_tp = p.getEulerFromQuaternion([cp_q_tp[1], cp_q_tp[2], cp_q_tp[3], cp_q_tp[0]])
-
-        return [rel_pos, np.array(list(cp_eu_tp)), np.array([0.5])]
-  
-
-    def _object_approached(self, hand_pose, obj_pose, atol): #not used
-        return goal_distance(np.array(hand_pose[:3]), np.array(obj_pose[:3])) < 0.1
-  """
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
