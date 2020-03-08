@@ -219,9 +219,9 @@ class iCubHandsEnv(iCubEnv):
             p.setJointMotorControlArray(self.robot_id, idx_fingers, p.VELOCITY_CONTROL, targetVelocities=vel,
                                         forces=[500] * len(idx_fingers))
 
-            p.setJointMotorControlArray(self.robot_id, self._motor_idxs[:-len(idx_fingers)], p.VELOCITY_CONTROL,
-                                        targetPositions=[0] * len(self._motor_idxs[:-len(idx_fingers)]),
-                                        forces=[50] * len(self._motor_idxs[:-len(idx_fingers)]))
+            # p.setJointMotorControlArray(self.robot_id, self._motor_idxs[:-len(idx_fingers)], p.VELOCITY_CONTROL,
+            #                             targetPositions=[0] * len(self._motor_idxs[:-len(idx_fingers)]),
+            #                             forces=[50] * len(self._motor_idxs[:-len(idx_fingers)]))
 
             p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
 

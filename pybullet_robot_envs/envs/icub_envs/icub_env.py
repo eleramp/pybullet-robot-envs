@@ -293,9 +293,6 @@ class iCubEnv:
             # workaround to block joints of not-controlled arm
             if self._use_simulation:
                 for i in range(self._num_joints):
-                    if i in self._joints_to_block:
-                        continue
-
                     jointInfo = p.getJointInfo(self.robot_id, i)
                     if jointInfo[3] > -1:
                         # minimize error is:
@@ -312,8 +309,6 @@ class iCubEnv:
             else:
                 # reset the joint state (ignoring all dynamics, not recommended to use during simulation)
                 for i in range(self._num_joints):
-                    if i in self._joints_to_block:
-                        continue
                     p.resetJointState(self.robot_id, i, jointPoses[i])
 
         else:

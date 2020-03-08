@@ -100,6 +100,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
         # Load base controller
         self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id,
                                                    robot_name='icub_hands',
+                                                   object_name=obj_name,
                                                    render=self._renders,
                                                    grasping_hand=self._control_arm,
                                                    noise_pcl=self._noise_pcl)
@@ -138,8 +139,8 @@ class iCubGraspResidualGymEnv1(gym.Env):
         # Configure action space
         action_dim = self._robot.get_action_dim()
         action_bound = 1
-        action_high = np.array([0.03, 0.03, 0.03, 0.785, 0.2, 1])
-        action_low = np.array([-0.03, -0.03, -0.03, -0.785, -0.2, -1])
+        action_high = np.array([0.05, 0.05, 0.05, 0.785, 0.2, 1])
+        action_low = np.array([-0.05, -0.05, -0.05, -0.785, -0.2, -1])
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
@@ -176,10 +177,9 @@ class iCubGraspResidualGymEnv1(gym.Env):
 
         self._robot.pre_grasp()
 
-        if self._obj_name is None:
-            obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
-            self._world._obj_name = obj_name
-            print("obj_name {}".format(obj_name))
+        obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)] if self._obj_name is None else self._obj_name
+        self._world._obj_name = obj_name
+        print("obj_name {}".format(obj_name))
 
         self._world.reset()
         # Let the world run for a bit
@@ -189,7 +189,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
         robot_obs, _ = self._robot.get_observation()
 
         # if self._first_call:
-        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
+        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id, object_name=obj_name,
                                     starting_pose=self._robot._home_hand_pose, n_control_pt=self._n_control_pt)
 
         self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))

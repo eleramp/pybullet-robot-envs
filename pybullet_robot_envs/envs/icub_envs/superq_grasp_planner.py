@@ -25,7 +25,7 @@ def get_real_icub_to_sim_robot():
 
 class SuperqGraspPlanner:
 
-    def __init__(self, robot_id, obj_id, robot_name,
+    def __init__(self, robot_id, obj_id, robot_name, object_name=None,
                  robot_base_pose=((0.0,) * 3, (0.0,)*4),
                  grasping_hand='r',
                  noise_pcl=0.02,
@@ -46,6 +46,7 @@ class SuperqGraspPlanner:
         self._robot_id = robot_id
         self._obj_id = obj_id
         self._robot_name = robot_name
+        self._object_name = object_name
         self._render = render
 
         self._pointcloud = PointCloud()
@@ -60,12 +61,13 @@ class SuperqGraspPlanner:
         self.seed()
         self.reset(self._robot_id, self._obj_id)
 
-    def reset(self, robot_id, obj_id, starting_pose=np.array(np.zeros(6)), n_control_pt=2):
+    def reset(self, robot_id, obj_id, object_name=None, starting_pose=np.array(np.zeros(6)), n_control_pt=2):
 
         self._starting_pose = starting_pose
         self._n_control_pt = n_control_pt
         self._robot_id = robot_id
         self._obj_id = obj_id
+        self._object_name = object_name
 
         # reset variables
         self._best_grasp_pose = []
@@ -84,15 +86,12 @@ class SuperqGraspPlanner:
         # ------ Set Superquadric Model parameters ------ #
         self._sq_estimator.SetNumericValue("tol", cfg.sq_model['tol'])
         self._sq_estimator.SetIntegerValue("print_level", 0)
-        self._sq_estimator.SetStringValue("object_class", cfg.sq_model['object_class'])
+        if self._object_name is not None and self._object_name in cfg.objects.keys():
+            self._sq_estimator.SetStringValue("object_class", cfg.objects[self._object_name])
+        else:
+            self._sq_estimator.SetStringValue("object_class", cfg.sq_model['object_class'])
         self._sq_estimator.SetIntegerValue("optimizer_points", cfg.sq_model['optimizer_points'])
         self._sq_estimator.SetBoolValue("random_sampling", cfg.sq_model['random_sampling'])
-        self._sq_estimator.SetBoolValue("merge_model", cfg.sq_model['merge_model'])
-        self._sq_estimator.SetIntegerValue("minimum_points", cfg.sq_model['minimum_points'])
-        self._sq_estimator.SetIntegerValue("fraction_pc", cfg.sq_model['fraction_pc'])
-        self._sq_estimator.SetNumericValue("threshold_axis", cfg.sq_model['threshold_axis'])
-        self._sq_estimator.SetNumericValue("threshold_section1", cfg.sq_model['threshold_section1'])
-        self._sq_estimator.SetNumericValue("threshold_section2", cfg.sq_model['threshold_section2'])
 
         # ------ Set Superquadric Grasp parameters ------ #
         self._grasp_estimator.SetIntegerValue("print_level", 0)

@@ -7,6 +7,19 @@ robots = [
         'panda',
     ]
 
+objects = {
+        'YcbMustardBottle': 'cylinder',
+        'YcbTomatoSoupCan': 'cylinder',
+        'YcbCrackerBox': 'box',
+        'YcbFoamBrick': 'box',
+        'YcbGelatinBox': 'box',
+        'YcbMasterChefCan': 'box',
+        'YcbPear': 'sphere',
+        'YcbPottedMeatCan': 'cylinder',
+        'YcbTennisBall': 'sphere',
+        'YcbChipsCan': 'cylinder',
+    }
+
 
 def get_robot_name_list():
     return robots
@@ -20,13 +33,9 @@ sq_model = {
     'object_class': 'default',  # cylinder, box, sphere, default
     'tol': 1e-5,
     'optimizer_points': 50,
-    'random_sampling': False,
+    'random_sampling': True,
     'merge_model': True,
     'minimum_points': 150,
-    'fraction_pc': 8,
-    'threshold_axis': 0.7,
-    'threshold_section1': 0.6,
-    'threshold_section2': 0.03,
 }
 
 sq_grasp = {
@@ -48,7 +57,7 @@ sq_grasp = {
         'tol': 1e-5,
         'constr_tol': 1e-4,
         'max_superq': 1,
-        'plane_table': [0.0, 0.0, 1.0, 0.15],  # check this
+        'plane_table': [0.0, 0.0, 1.0, 0.09],  # check this
         'displacement': [0.00, 0.00, 0.00],  # check this
         'hand_sq': [0.03, 0.06, 0.03, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         # how to set the following bounds?

@@ -101,6 +101,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         # Load base controller
         self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id,
                                                    robot_name='icub_hands',
+                                                   object_name=obj_name,
                                                    render=self._renders,
                                                    grasping_hand=self._control_arm,
                                                    noise_pcl=self._noise_pcl)
@@ -177,10 +178,9 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         self._robot.pre_grasp()
 
-        if self._obj_name is None:
-            obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
-            self._world._obj_name = obj_name
-            print("obj_name {}".format(obj_name))
+        obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)] if self._obj_name is None else self._obj_name
+        self._world._obj_name = obj_name
+        print("obj_name {}".format(obj_name))
 
         self._world.reset()
         # Let the world run for a bit
@@ -190,7 +190,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         robot_obs, _ = self._robot.get_observation()
 
         # if self._first_call:
-        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
+        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id, object_name=obj_name,
                                     starting_pose=self._robot._home_hand_pose, n_control_pt=self._n_control_pt)
 
         self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
@@ -208,10 +208,10 @@ class iCubGraspResidualGymEnv(gym.Env):
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
 
-        self._target_h_lift = world_obs[2] + 0.1
+        self._target_h_lift = world_obs[2] + 0.09
 
         self._t_grasp, self._t_lift = 0, 0
-        self._grasping_step = 15
+        self._grasping_step = 20
         self.last_approach_step = False
 
         obs, _ = self.get_extended_observation()
@@ -260,7 +260,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         print("grasp pose: {}".format(self._grasp_pose))
 
         if self._renders:
-            self._base_controller._visualizer.render()
+            self._base_controller._visualizer.visualize()
 
     def get_extended_observation(self):
         self._observation = []
@@ -395,20 +395,21 @@ class iCubGraspResidualGymEnv(gym.Env):
 
         if self.last_approach_step and self._grasping_step > 0:
             # do grasp in velocity control
-            self._robot.grasp(0)
             ct_forces = np.zeros(5)
-            # n_step = 20
             self._grasping_step -= 1
-            print(" grasping step {}".format(self._grasping_step))
+            # n_step = 20
 
         elif self.last_approach_step and self._grasping_step <= 0:
             # do lift
             final_action_pos[2] += 0.1
-            self._robot.stop_grasp()
-            self._env_step_counter = self._max_steps - self._action_repeat + 1
 
         for _ in range(self._action_repeat):
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
+            if self.last_approach_step and self._grasping_step > 0:
+                self._robot.grasp(0)
+            elif self.last_approach_step and self._grasping_step <= 0:
+                self._robot.stop_grasp()
+
             p.stepSimulation()
             if self._renders:
                 time.sleep(self._time_step)
@@ -515,7 +516,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         #     return np.float32(1.)
 
         # here check lift for termination
-        if self._object_lifted(w_obs[2], self._target_h_lift):
+        if self._object_lifted(w_obs[2], self._target_h_lift) and self._t_lift >= 1:
             print("SUCCESS")
             return np.float32(1.)
 
@@ -553,8 +554,11 @@ class iCubGraspResidualGymEnv(gym.Env):
         #     r = np.float32(100.0)
 
         if self._object_lifted(w_obs[2], self._target_h_lift):
-            r += np.float32(100.0)
+            r += np.float32(10.0)
             c1 = 0
+            self._t_lift += self._time_step * self._action_repeat
+        else:
+            self._t_lift = 0
 
         reward = r - (c1 + c2)
 
