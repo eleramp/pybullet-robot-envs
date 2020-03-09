@@ -294,6 +294,8 @@ class iCubEnv:
             if self._use_simulation:
                 for i in range(self._num_joints):
                     jointInfo = p.getJointInfo(self.robot_id, i)
+                    if i in self._joints_to_block:
+                        continue
                     if jointInfo[3] > -1:
                         # minimize error is:
                         # error = position_gain * (desired_position - actual_position) +

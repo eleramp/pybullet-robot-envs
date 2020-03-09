@@ -168,14 +168,19 @@ class iCubHandsEnv(iCubEnv):
                 p.stepSimulation()
 
     def pre_grasp(self):
-        # move fingers to pre-grasp configuration
+        # moev fingers to pre-grasp configuration
         if self._control_arm is 'l':
-            idx = self._indices_left_hand[-4]
+            idx_thumb = self._indices_left_hand[-4]
+            idx_fingers = self._indices_left_hand
         else:
-            idx = self._indices_right_hand[-4]
+            idx_thumb = self._indices_right_hand[-4]
+            idx_fingers = self._indices_right_hand
 
-        p.resetJointState(self.robot_id, idx, 1.57)
-        p.setJointMotorControl2(self.robot_id, idx, p.POSITION_CONTROL, targetPosition=1.57, force=50)
+        p.setJointMotorControlArray(self.robot_id, idx_fingers, p.POSITION_CONTROL,
+                                    targetPositions=[0] * len(idx_fingers),
+                                    forces=[500] * len(idx_fingers))
+
+        p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500)
 
     def stop_grasp(self):
         # close fingers
