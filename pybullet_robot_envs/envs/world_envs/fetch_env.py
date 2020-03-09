@@ -124,7 +124,7 @@ class WorldFetchEnv:
         px = x_min + 0.4 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.5 * (self._ws_lim[1][1] - self._ws_lim[1][0])
         pz = self._h_table+0.06
-        quat = p.getQuaternionFromEuler([0.0, 0.0, 2/3*m.pi])
+        quat = p.getQuaternionFromEuler([0.0, 0.0, 1/4*m.pi])
 
         if self._obj_pose_rnd_std > 0:
             # Add a Gaussian noise to position
@@ -138,7 +138,7 @@ class WorldFetchEnv:
             py = np.clip(py, self._ws_lim[1][0], self._ws_lim[1][1])
 
             # Add uniform noise to yaw orientation
-            quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=1/4*m.pi, high=3/4*m.pi)])
+            quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=-1/4*m.pi, high=1/4*m.pi)])
 
         obj_pose = (px, py, pz) + quat
 
