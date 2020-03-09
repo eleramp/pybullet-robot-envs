@@ -207,14 +207,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
 
-        self._target_h_lift = world_obs[2] + 0.15
-
-        # move hand to the first way point on approach trajectory
-        base_action, done = self._base_controller.get_next_action(robot_obs[:6], world_obs[:6])
-        for _ in range(10):
-            self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
-            for _ in range(10):
-                p.stepSimulation()
+        self._target_h_lift = world_obs[2] + 0.09
 
         self._t_grasp, self._t_lift = 0, 0
 
@@ -413,22 +406,6 @@ class iCubGraspResidualGymEnv1(gym.Env):
         if last_approach_step:
             # print("!! last step, continue with grasp and lift from base controller")
 
-            '''  # position control 
-            grasp_steps = [i / 20 for i in range(0, 21, 1)]
-
-            for i in grasp_steps:
-                # send open/close command to fingers
-                self._robot.grasp(i)
-                self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
-
-                for _ in range(7):
-                    p.stepSimulation()
-                    time.sleep(self._time_step)
-                if self._termination():
-                    break
-                self._robot.check_contact_fingertips(self._world.obj_id)
-            self._robot.grasp(i)
-            '''
             # velocity control
             self._robot.grasp(0)
             ct_forces = np.zeros(5)
@@ -483,13 +460,17 @@ class iCubGraspResidualGymEnv1(gym.Env):
         w_obs, _ = self._world.get_observation()
         r_obs, _ = self._robot.get_observation()
 
+        info = {
+            'is_success': self._is_success(w_obs),
+        }
+
         done = self._termination(w_obs)
         reward = self._compute_reward(w_obs, r_obs)
 
         # print("reward")
         # print(reward)
 
-        return obs, np.array(reward), np.array(done), {}
+        return obs, np.array(reward), np.array(done), info
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -561,6 +542,13 @@ class iCubGraspResidualGymEnv1(gym.Env):
             return np.float32(1.)
 
         return np.float32(0.)
+
+    def _is_success(self, w_obs):
+        if self._object_lifted(w_obs[2], self._target_h_lift):
+            print("SUCCESS")
+            return np.float32(1.)
+        else:
+            return np.float32(0.)
 
     def _compute_reward(self, w_obs, r_obs):
         c1, c2, r = np.float32(0.0), np.float32(0.0), np.float32(0.0)

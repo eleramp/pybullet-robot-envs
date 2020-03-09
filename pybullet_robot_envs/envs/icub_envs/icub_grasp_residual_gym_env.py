@@ -407,8 +407,8 @@ class iCubGraspResidualGymEnv(gym.Env):
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
             if self.last_approach_step and self._grasping_step > 0:
                 self._robot.grasp(0)
-            elif self.last_approach_step and self._grasping_step <= 0:
-                self._robot.stop_grasp()
+            # elif self.last_approach_step and self._grasping_step <= 0:
+            #    self._robot.stop_grasp()
 
             p.stepSimulation()
             if self._renders:
@@ -448,13 +448,17 @@ class iCubGraspResidualGymEnv(gym.Env):
         w_obs, _ = self._world.get_observation()
         r_obs, _ = self._robot.get_observation()
 
+        info = {
+            'is_success': self._is_success(w_obs),
+        }
+
         done = self._termination(w_obs)
         reward = self._compute_reward(w_obs, r_obs)
 
         # print("reward")
         # print(reward)
 
-        return obs, np.array(reward), np.array(done), {}
+        return obs, np.array(reward), np.array(done), info
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -525,6 +529,13 @@ class iCubGraspResidualGymEnv(gym.Env):
             return np.float32(1.)
 
         return np.float32(0.)
+
+    def _is_success(self, w_obs):
+        if self._object_lifted(w_obs[2], self._target_h_lift) and self._t_lift >= 1:
+            print("SUCCESS")
+            return np.float32(1.)
+        else:
+            return np.float32(0.)
 
     def _compute_reward(self, w_obs, r_obs):
         c1, c2, r = np.float32(0.0), np.float32(0.0), np.float32(0.0)

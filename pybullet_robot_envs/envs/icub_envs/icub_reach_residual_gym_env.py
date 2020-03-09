@@ -399,8 +399,9 @@ class iCubReachResidualGymEnv(gym.Env):
                 time.sleep(self._time_step)
 
             w_obs, _ = self._world.get_observation()
+            r_obs, _ = self._robot.get_observation()
 
-            if self._termination(w_obs):
+            if self._termination(w_obs, r_obs):
                 break
 
             self._env_step_counter += 1
@@ -421,13 +422,17 @@ class iCubReachResidualGymEnv(gym.Env):
         w_obs, _ = self._world.get_observation()
         r_obs, _ = self._robot.get_observation()
 
-        done = self._termination(w_obs)
+        info = {
+            'is_success': self._is_success(w_obs, r_obs),
+        }
+
+        done = self._termination(w_obs, r_obs)
         reward = self._compute_reward(w_obs, r_obs)
 
         # print("reward")
         # print(reward)
 
-        return obs, np.array(reward), np.array(done), {}
+        return obs, np.array(reward), np.array(done), info
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -470,7 +475,7 @@ class iCubReachResidualGymEnv(gym.Env):
         rgb_array = rgb_array[:, :, :3]
         return rgb_array
 
-    def _termination(self, w_obs):
+    def _termination(self, w_obs, r_obs):
 
         # early termination if object falls
         if self._control_eu_or_quat is 1:
@@ -484,8 +489,6 @@ class iCubReachResidualGymEnv(gym.Env):
             return np.float32(1.)
 
         # rew 1: distance between hand and grasp pose
-        r_obs, _ = self._robot.get_observation()
-        # Compute distance between goal and the achieved goal.
         d = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
         if d <= self._distance_threshold and self._t_grasp >= 1:
             print("SUCCESS")
@@ -501,6 +504,14 @@ class iCubReachResidualGymEnv(gym.Env):
         #    return np.float32(1.)
 
         return np.float32(0.)
+
+    def _is_success(self, w_obs, r_obs):
+        d = goal_distance(np.array(r_obs[:3]), np.array(self._grasp_pose[:3]))
+        if d <= self._distance_threshold and self._t_grasp >= 1:
+            return np.float32(1.)
+        else:
+            return np.float32(0.)
+
 
     def _compute_reward(self, w_obs, r_obs):
         c1, c2, r = np.float32(0.0), np.float32(0.0), np.float32(0.0)
