@@ -62,7 +62,7 @@ class iCubReachResidualGymEnv(gym.Env):
         self._noise_pcl = noise_pcl
         self._last_frame_time = 0
         self._use_superq = use_superq
-        self._distance_threshold = 0.03
+        self._distance_threshold = 0.05
 
         self._log_file = []
         self._log_file_path = []
@@ -177,10 +177,9 @@ class iCubReachResidualGymEnv(gym.Env):
 
         self._robot.pre_grasp()
 
-        if self._obj_name is None:
-            obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
-            self._world._obj_name = obj_name
-            print("obj_name {}".format(obj_name))
+        obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)] if self._obj_name is None else self._obj_name
+        self._world._obj_name = obj_name
+        print("obj_name {}".format(obj_name))
 
         self._world.reset()
         # Let the world run for a bit
@@ -208,15 +207,6 @@ class iCubReachResidualGymEnv(gym.Env):
 
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
-
-        # move hand to the first way point on approach trajectory
-        base_action, done = self._base_controller.get_next_action(robot_obs[:6], world_obs[:6])
-        for _ in range(10):
-            self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
-            for _ in range(10):
-                p.stepSimulation()
-                if self._renders:
-                    time.sleep(self._time_step)
 
         self._t_grasp, self._t_lift = 0, 0
 
@@ -391,7 +381,6 @@ class iCubReachResidualGymEnv(gym.Env):
 
         # get action from base controller
         base_action, done = self._base_controller.get_next_action()
-        print("base action {}".format(base_action))
 
         final_action_pos = np.add(base_action[0], pos_action)
         final_action_quat = np.quaternion(base_action[1][3], base_action[1][0], base_action[1][1], base_action[1][2]) * \
@@ -404,6 +393,7 @@ class iCubReachResidualGymEnv(gym.Env):
 
         for _ in range(self._action_repeat):
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat_1)
+            self._robot.pre_grasp()
             p.stepSimulation()
             if self._renders:
                 time.sleep(self._time_step)
@@ -434,8 +424,8 @@ class iCubReachResidualGymEnv(gym.Env):
         done = self._termination(w_obs)
         reward = self._compute_reward(w_obs, r_obs)
 
-        print("reward")
-        print(reward)
+        # print("reward")
+        # print(reward)
 
         return obs, np.array(reward), np.array(done), {}
 

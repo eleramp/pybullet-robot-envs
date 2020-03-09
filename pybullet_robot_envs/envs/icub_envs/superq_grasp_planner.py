@@ -328,7 +328,7 @@ class SuperqGraspPlanner:
         # linear path from initial to grasping pose
         dist_object = np.linalg.norm(sp_P_gp[0])
         # fixed distance among way-points
-        dist_intra_path_points = 10 / self._n_control_pt * 0.01
+        dist_intra_path_points = 8 / self._n_control_pt * 0.01
         n_pt = int(dist_object / dist_intra_path_points)
 
         i_path = [1 if n_pt == 0 else i / n_pt for i in range(0, n_pt + 1)]
