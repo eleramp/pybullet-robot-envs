@@ -58,10 +58,10 @@ register(
                 'obj_pose_rnd_std': 0.05,
                 'noise_pcl': 0.0,
                 'use_superq': 1,
-                'max_steps': 1000,
+                'max_steps': 500,
                 'n_control_pt': 4,
                 'r_weights': [-5, -10, 10],
-                'obj_name': 0,
+                'obj_name': 1,
                 'renders': False},
 )
 # during the grasp execution, the hand pose can be changed by the RL agent
