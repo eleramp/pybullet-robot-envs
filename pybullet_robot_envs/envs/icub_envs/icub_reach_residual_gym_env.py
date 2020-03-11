@@ -256,7 +256,7 @@ class iCubReachResidualGymEnv(gym.Env):
         print("grasp pose: {}".format(self._grasp_pose))
 
         if self._renders:
-            self._base_controller._visualizer.visualize()
+            self._base_controller._visualizer.render()
 
     def get_extended_observation(self):
         self._observation = []
@@ -429,8 +429,8 @@ class iCubReachResidualGymEnv(gym.Env):
         done = self._termination(w_obs, r_obs)
         reward = self._compute_reward(w_obs, r_obs)
 
-        # print("reward")
-        # print(reward)
+        print("reward")
+        print(reward)
 
         return obs, np.array(reward), np.array(done), info
 
@@ -448,8 +448,8 @@ class iCubReachResidualGymEnv(gym.Env):
         base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id)
 
         cam_dist = 1.3
-        cam_yaw = 180
-        cam_pitch = -40
+        cam_yaw = 90
+        cam_pitch = -60
         RENDER_HEIGHT = 720
         RENDER_WIDTH = 960
 

@@ -486,8 +486,8 @@ class iCubGraspResidualGymEnv1(gym.Env):
         base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id)
 
         cam_dist = 1.3
-        cam_yaw = 180
-        cam_pitch = -40
+        cam_yaw = 90
+        cam_pitch = -60
         RENDER_HEIGHT = 720
         RENDER_WIDTH = 960
 
