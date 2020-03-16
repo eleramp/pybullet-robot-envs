@@ -123,7 +123,11 @@ class WorldFetchEnv:
 
         px = x_min + 0.4 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.5 * (self._ws_lim[1][1] - self._ws_lim[1][0])
-        pz = self._h_table+0.06
+        if self._obj_name is 'YcbCrackerBox':
+            pz = self._h_table + 0.1
+        else:
+            pz = self._h_table + 0.06
+
         quat = p.getQuaternionFromEuler([0.0, 0.0, 1/4*m.pi])
 
         if self._obj_pose_rnd_std > 0:

@@ -48,7 +48,7 @@ class iCubHandsEnv(iCubEnv):
 
         self._grasp_pos = [0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 1.57, 0.4, 0.2, 0.07]
 
-        self._workspace_lim = [[0.2, 0.5], [-0.2, 0.2], [0.5, 1.0]]
+        self._workspace_lim = [[0.2, 0.45], [-0.2, 0.2], [0.5, 1.0]]
         self._eu_lim = [[-m.pi, m.pi],[-m.pi, m.pi], [-m.pi, m.pi]]
 
         self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default

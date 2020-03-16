@@ -498,11 +498,6 @@ class iCubReachResidualGymEnv(gym.Env):
             print("MAX STEPS")
             return np.float32(1.)
 
-        # here check lift for termination
-        # if self._object_lifted(world_obs[2], world_obs[-1]) and self._t_lift >= 2:
-        #    print("SUCCESS")
-        #    return np.float32(1.)
-
         return np.float32(0.)
 
     def _is_success(self, w_obs, r_obs):
@@ -511,7 +506,6 @@ class iCubReachResidualGymEnv(gym.Env):
             return np.float32(1.)
         else:
             return np.float32(0.)
-
 
     def _compute_reward(self, w_obs, r_obs):
         c1, c2, r = np.float32(0.0), np.float32(0.0), np.float32(0.0)
