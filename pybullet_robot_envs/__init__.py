@@ -64,6 +64,23 @@ register(
                 'obj_name': 1,
                 'renders': False},
 )
+
+register(
+        id='iCubReachGraspResidual-v0',
+        entry_point='pybullet_robot_envs.envs:iCubReachGraspResidualGymEnv',
+        max_episode_steps=1000,
+        kwargs={'control_arm': 'r',
+                'control_orientation': 1,
+                'obj_pose_rnd_std': 0.05,
+                'noise_pcl': 0.0,
+                'use_superq': 1,
+                'max_steps': 500,
+                'n_control_pt': 4,
+                'r_weights': [-5, -10, 5, 5],
+                'obj_name': 1,
+                'renders': False},
+)
+
 # during the grasp execution, the hand pose can be changed by the RL agent
 register(
         id='iCubGraspResidual-v0',
