@@ -70,6 +70,13 @@ class pandaEnv:
                                     self._base_position[2] + 0.4,
                                     -2/3*m.pi, -m.pi/4, 0]  # x,y,z,roll,pitch,yaw
 
+            self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._base_position[0] + 0.2)),
+                                    min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], self._base_position[1] - 0.2)),
+                                    min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._base_position[2] + 0.4)),
+                                    min(m.pi, max(-m.pi, -2/3*m.pi)),
+                                    min(m.pi, max(-m.pi, -m.pi/4)),
+                                    min(m.pi, max(-m.pi, 0))]
+
             self.apply_action(self._home_hand_pose)
             p.stepSimulation()
 
@@ -202,7 +209,7 @@ class pandaEnv:
             jointPoses = p.calculateInverseKinematics(self.robot_id, self.endEffLink, new_pos, new_quat_orn,
                                                       maxNumIterations=100,
                                                       residualThreshold=.001)
-
+            jointPoses = np.multiply(1, jointPoses)
             if self._use_simulation:
                     for i in range(self._num_dof):
                         jointInfo = p.getJointInfo(self.robot_id, i)

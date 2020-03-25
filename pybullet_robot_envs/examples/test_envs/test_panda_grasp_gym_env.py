@@ -18,7 +18,7 @@ import math as m
 
 def main():
 
-    env = PandaGraspResidualGymEnv(obj_pose_rnd_std=0.0, renders=True)
+    env = PandaReachResidualGymEnv(obj_pose_rnd_std=0.05, renders=True, obj_name=1)
     motorsIds = []
 
     dv = 1
