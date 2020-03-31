@@ -60,7 +60,7 @@ class iCubReachGraspResidualGymEnv(gym.Env):
         self._noise_pcl = noise_pcl
         self._last_frame_time = 0
         self._use_superq = use_superq
-        self._distance_threshold = 0.1
+        self._distance_threshold = 0.2
         self._target_h_lift = 0.85
         self._grasping_step = 0
         self._r_weights = r_weights
@@ -145,8 +145,8 @@ class iCubReachGraspResidualGymEnv(gym.Env):
         # Configure action space
         action_dim = self._robot.get_action_dim()
         action_bound = 1
-        action_high = np.array([0.05, 0.05, 0.05, 0.785, 0.785, 1])
-        action_low = np.array([-0.05, -0.05, -0.05, -0.785, -0.785, -1])
+        action_high = np.array([0.08, 0.08, 0.08, 0.785, 0.785, 1])
+        action_low = np.array([-0.08, -0.08, -0.08, -0.785, -0.785, -1])
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
@@ -553,8 +553,7 @@ class iCubReachGraspResidualGymEnv(gym.Env):
     def _compute_reward(self, w_obs, r_obs, action):
         c1, c2, r = np.float32(0.0), np.float32(0.0), np.float32(0.0)
 
-        r = -0.5 * np.linalg.norm(action)
-        print("r is {}".format(r))
+        r = -8 * np.linalg.norm(action)
 
         # cost 1: object touched
         if self._world.check_contact(self._robot.robot_id) and not self.last_approach_step:
