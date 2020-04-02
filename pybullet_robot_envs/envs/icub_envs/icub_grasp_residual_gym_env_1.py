@@ -76,15 +76,18 @@ class iCubGraspResidualGymEnv1(gym.Env):
         # Initialize PyBullet simulator
         self._p = p
         if self._renders:
-            self._cid = p.connect(p.SHARED_MEMORY)
-            if self._cid < 0:
-                self._cid = p.connect(p.GUI)
-            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0])
+            self._physics_client_id = p.connect(p.SHARED_MEMORY)
+
+            if self._physics_client_id < 0:
+                self._physics_client_id = p.connect(p.GUI)
+
+            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0], physicsClientId=self._physics_client_id)
         else:
-            self._cid = p.connect(p.DIRECT)
+            self._physics_client_id = p.connect(p.DIRECT)
 
         # Load robot
-        self._robot = iCubHandsEnv(use_IK=1, control_arm=self._control_arm,
+        self._robot = iCubHandsEnv(self._physics_client_id,
+                                   use_IK=1, control_arm=self._control_arm,
                                    control_orientation=self._control_orientation,
                                    control_eu_or_quat=self._control_eu_or_quat)
 
@@ -93,12 +96,14 @@ class iCubGraspResidualGymEnv1(gym.Env):
             obj_name = get_ycb_objects_list()[0]
         else:
             obj_name = self._obj_name
-        self._world = YcbWorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
+        self._world = YcbWorldFetchEnv(self._physics_client_id,
+                                       obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                        workspace_lim=self._robot._workspace_lim,
                                        control_eu_or_quat=self._control_eu_or_quat)
 
         # Load base controller
-        self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id,
+        self._base_controller = SuperqGraspPlanner(self._physics_client_id,
+                                                   self._robot.robot_id, self._world.obj_id,
                                                    robot_name='icub_hands',
                                                    object_name=obj_name,
                                                    render=self._renders,
@@ -149,9 +154,9 @@ class iCubGraspResidualGymEnv1(gym.Env):
 
         if DO_LOGGING:
             if self.logId is not None:
-                p.stopStateLogging(self.logId)
+                p.stopStateLogging(self.logId, physicsClientId=self._physics_client_id)
             if self.logId_ct is not None:
-                p.stopStateLogging(self.logId_ct)
+                p.stopStateLogging(self.logId_ct, physicsClientId=self._physics_client_id)
             print("logging closed")
 
             if not self._log_file[0].closed:
@@ -162,18 +167,18 @@ class iCubGraspResidualGymEnv1(gym.Env):
                 self._log_file[1].close()
             self._log_file[1] = open(self._log_file_path[1], "a+")
 
-        p.resetSimulation()
-        p.setPhysicsEngineParameter(numSolverIterations=150)
-        p.setTimeStep(self._time_step)
+        p.resetSimulation(physicsClientId=self._physics_client_id)
+        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
+        p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
         self._env_step_counter = 0
 
-        p.setGravity(0, 0, -9.8)
+        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
 
         self._robot.reset()
 
         # Let the world run for a bit
         for _ in range(50):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         self._robot.pre_grasp()
 
@@ -184,7 +189,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
         self._world.reset()
         # Let the world run for a bit
         for _ in range(200):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         robot_obs, _ = self._robot.get_observation()
 
@@ -202,7 +207,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
             self._robot.debug_gui()
             self._world.debug_gui()
             self.debug_gui()
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
@@ -216,10 +221,14 @@ class iCubGraspResidualGymEnv1(gym.Env):
         if DO_LOGGING:
             print("------------------------>>>>>start logging")
 
-            self.logId = p.startStateLogging(p.STATE_LOGGING_GENERIC_ROBOT, "log_successful_grasp.bin")
+            self.logId = p.startStateLogging(p.STATE_LOGGING_GENERIC_ROBOT,
+                                             "log_successful_grasp.bin",
+                                             physicsClientId=self._physics_client_id)
+
             self.logId_ct = p.startStateLogging(p.STATE_LOGGING_CONTACT_POINTS, "log_successful_grasp_ct.bin",
                                                 bodyUniqueIdA=self._robot.robot_id,
-                                                bodyUniqueIdB=self._world.obj_id)
+                                                bodyUniqueIdB=self._world.obj_id,
+                                                physicsClientId=self._physics_client_id)
 
         return obs
 
@@ -393,7 +402,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
         self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
 
         for _ in range(self._action_repeat):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
             if self._renders:
                 time.sleep(self._time_step)
 
@@ -413,7 +422,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
             for _ in range(0, n_step):
                 self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
                 for _ in range(0, 10):
-                    p.stepSimulation()
+                    p.stepSimulation(physicsClientId=self._physics_client_id)
                     _, curr_forces = self._robot.check_contact_fingertips(self._world.obj_id)
                     ct_forces = np.add(ct_forces, curr_forces)
                 ct_forces = np.divide(ct_forces, 10)
@@ -422,7 +431,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
                 if len(f_big) >= 3:
                     self._robot.stop_grasp()
                     # print("stop grasp motion")
-                    p.stepSimulation()
+                    p.stepSimulation(physicsClientId=self._physics_client_id)
                     if self._renders:
                         time.sleep(self._time_step)
                     break
@@ -431,7 +440,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
 
             for _ in range(int(self._action_repeat / 2)):
-                p.stepSimulation()
+                p.stepSimulation(physicsClientId=self._physics_client_id)
                 if self._renders:
                     time.sleep(self._time_step)
 
@@ -439,7 +448,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
 
             for _ in range(self._action_repeat):
-                p.stepSimulation()
+                p.stepSimulation(physicsClientId=self._physics_client_id)
                 time.sleep(self._time_step)
 
             self._env_step_counter = self._max_steps
@@ -483,7 +492,7 @@ class iCubGraspResidualGymEnv1(gym.Env):
         if mode != "rgb_array":
             return np.array([])
 
-        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id)
+        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id, physicsClientId=self._physics_client_id)
 
         cam_dist = 1.3
         cam_yaw = 90
@@ -496,15 +505,18 @@ class iCubGraspResidualGymEnv1(gym.Env):
                                                                 yaw=cam_yaw,
                                                                 pitch=cam_pitch,
                                                                 roll=0,
-                                                                upAxisIndex=2)
+                                                                upAxisIndex=2,
+                                                                physicsClientId=self._physics_client_id)
 
         proj_matrix = self._p.computeProjectionMatrixFOV(fov=60, aspect=float(RENDER_WIDTH) / RENDER_HEIGHT,
-                                                         nearVal=0.1, farVal=100.0)
+                                                         nearVal=0.1, farVal=100.0,
+                                                         physicsClientId=self._physics_client_id)
 
         (_, _, px, _, _) = self._p.getCameraImage(width=RENDER_WIDTH, height=RENDER_HEIGHT,
                                                   viewMatrix=view_matrix,
                                                   projectionMatrix=proj_matrix,
-                                                  renderer=self._p.ER_BULLET_HARDWARE_OPENGL)
+                                                  renderer=self._p.ER_BULLET_HARDWARE_OPENGL,
+                                                  physicsClientId=self._physics_client_id)
         # renderer=self._p.ER_TINY_RENDERER)
 
         rgb_array = np.array(px, dtype=np.uint8)
@@ -605,9 +617,9 @@ class iCubGraspResidualGymEnv1(gym.Env):
         pay = np_pose + np.array(list(dcm.dot([0, 0.1, 0])))
         paz = np_pose + np.array(list(dcm.dot([0, 0, 0.1])))
 
-        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0])
-        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0])
-        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1])
+        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0], physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0], physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1], physicsClientId=self._physics_client_id)
 
         pose = self._grasp_pose[:3]
 
@@ -618,9 +630,9 @@ class iCubGraspResidualGymEnv1(gym.Env):
         pay = np_pose + np.array(list(dcm.dot([0, 0.1, 0])))
         paz = np_pose + np.array(list(dcm.dot([0, 0, 0.1])))
 
-        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0])
-        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0])
-        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1])
+        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0], physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0], physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1], physicsClientId=self._physics_client_id)
 
     def dump_data(self, data):
         if len(data) is 2:

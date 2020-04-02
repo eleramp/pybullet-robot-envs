@@ -25,12 +25,13 @@ def get_real_icub_to_sim_robot():
 
 class SuperqGraspPlanner:
 
-    def __init__(self, robot_id, obj_id, robot_name, object_name=None,
+    def __init__(self, physicsClientId, robot_id, obj_id, robot_name, object_name=None,
                  robot_base_pose=((0.0,) * 3, (0.0,)*4),
                  grasping_hand='r',
                  noise_pcl=0.02,
                  render=True):
 
+        self._physics_client_id = physicsClientId  # this is needed only for visualization (of the trajectory points)
         self._grasping_hand = grasping_hand
         self._noise_pcl = noise_pcl
         self._robot_base_pose = robot_base_pose
@@ -102,6 +103,8 @@ class SuperqGraspPlanner:
         self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp[self._robot_name]['plane_table']))
         self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp[self._robot_name]['displacement']))
         self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp[self._robot_name]['hand_sq']))
+        self._grasp_estimator.setMatrix("bounds_right", np.array(cfg.sq_grasp[self._robot_name]['bounds_right']))
+        self._grasp_estimator.setMatrix("bounds_left", np.array(cfg.sq_grasp[self._robot_name]['bounds_left']))
 
         return
 
@@ -168,7 +171,7 @@ class SuperqGraspPlanner:
             v2 = w_robot_R_obj.dot(v1)
             sph_vec = sph_coord(v2[0], v2[1], v2[2])
             # sample only points visible to the robot eyes, to simulate partial observability of the object
-            if sph_vec[1] <= m.pi/8 or -m.pi/2 < sph_vec[2] < m.pi/2 or v1[0] < 0:
+            if sph_vec[1] <= m.pi/6 or -m.pi/2 < sph_vec[2] < m.pi/2 or v1[0] < 0:
                 v3 = v2 + w_robot_T_obj[0]
                 v3[0] += noise[i]
 
@@ -237,10 +240,10 @@ class SuperqGraspPlanner:
             return False
 
         sq_hand = grasp_res_hand.hand_superq
-        pointcloud = PointCloud()
-        points = superquadric_bindings.vector_deque_Vector3d()
-        points = grasp_res_hand.points_on[0]
-        pointcloud.setPoints(points)
+        # pointcloud = PointCloud()
+        # points = superquadric_bindings.vector_deque_Vector3d()
+        # points = grasp_res_hand.points_on[0]
+        # pointcloud.setPoints(points)
 
         # visualize them
         if self._render:
@@ -248,7 +251,7 @@ class SuperqGraspPlanner:
             self._visualizer.addPoses(grasp_res_hand.grasp_poses)
             self._visualizer.addPlane(self._grasp_estimator.getPlaneHeight())
             self._visualizer.addSuperqHands(sq_hand)
-            self._visualizer.addPointsHands(pointcloud)
+            # self._visualizer.addPointsHands(pointcloud)
 
         # ------> Estimate pose cost <-------- #
         # TODO: Compute pose hat
@@ -411,6 +414,6 @@ class SuperqGraspPlanner:
             pay = np_pose + np.array(list(dcm.dot([0, 0.1, 0])))
             paz = np_pose + np.array(list(dcm.dot([0, 0, 0.1])))
 
-            p.addUserDebugLine(pt[0], pax.tolist(), [1, 0, 0], lifeTime=0)
-            p.addUserDebugLine(pt[0], pay.tolist(), [0, 1, 0], lifeTime=0)
-            p.addUserDebugLine(pt[0], paz.tolist(), [0, 0, 1], lifeTime=0)
+            p.addUserDebugLine(pt[0], pax.tolist(), [1, 0, 0], lifeTime=0, physicsClientId=self._physics_client_id)
+            p.addUserDebugLine(pt[0], pay.tolist(), [0, 1, 0], lifeTime=0, physicsClientId=self._physics_client_id)
+            p.addUserDebugLine(pt[0], paz.tolist(), [0, 0, 1], lifeTime=0, physicsClientId=self._physics_client_id)

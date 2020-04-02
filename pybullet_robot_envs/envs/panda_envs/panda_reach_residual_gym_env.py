@@ -75,27 +75,29 @@ class PandaReachResidualGymEnv(gym.Env):
         # Initialize PyBullet simulator
         self._p = p
         if self._renders:
-            self._cid = p.connect(p.SHARED_MEMORY)
-            if self._cid < 0:
-                self._cid = p.connect(p.GUI)
-            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0])
+            self._physics_client_id = p.connect(p.SHARED_MEMORY)
+            if self._physics_client_id < 0:
+                self._physics_client_id = p.connect(p.GUI)
+            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0], physicsClientId=self._physics_client_id)
         else:
-            self._cid = p.connect(p.DIRECT)
+            self._physics_client_id = p.connect(p.DIRECT)
 
         # Load robot
-        self._robot = pandaEnv(use_IK=1)
+        self._robot = pandaEnv(self._physics_client_id, use_IK=1)
 
         # Load world environment
         if self._obj_name is None:
             obj_name = get_ycb_objects_list()[0]
         else:
             obj_name = self._obj_name
-        self._world = YcbWorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
+        self._world = YcbWorldFetchEnv(self._physics_client_id,
+                                       obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                        workspace_lim=self._robot._workspace_lim,
                                        control_eu_or_quat=self._control_eu_or_quat)
 
         # Load base controller
-        self._base_controller = SuperqGraspPlanner(self._robot.robot_id, self._world.obj_id, robot_name='panda',
+        self._base_controller = SuperqGraspPlanner(self._physics_client_id,
+                                                   self._robot.robot_id, self._world.obj_id, robot_name='panda',
                                                    render=self._renders,
                                                    grasping_hand='r',
                                                    noise_pcl=self._noise_pcl)

@@ -47,10 +47,10 @@ sq_grasp = {
         'displacement': [0.00, 0.00, 0.00],  # check this
         'hand_sq': [0.03, 0.06, 0.03, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         # how to set the following bounds?
-        'bounds_right': [-0.5, 0.0, -0.25, 0.25, -0.3, 0.3, -math.pi, math.pi, -math.pi, math.pi, -math.pi, math.pi],
-        'bounds_left': [-0.5, 0.0, -0.2, 0.2, -0.3, 0.3, -math.pi, math.pi, -math.pi, math.pi, -math.pi, math.pi],
-        'bounds_constr_right': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.001, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001, 10.0, 0.00001, 10.0],
-        'bounds_constr_left': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.01, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001, 10.0, 0.00001, 10.0],
+        'bounds_right': [[-0.5, 0.0], [-0.25, 0.25], [-0.3, 0.3], [-math.pi, math.pi], [-math.pi, math.pi], [-math.pi, math.pi]],
+        'bounds_left': [[-0.5, 0.0], [-0.25, 0.25], [-0.3, 0.3], [-math.pi, math.pi], [-math.pi, math.pi], [-math.pi, math.pi]],
+        # 'bounds_constr_right': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.001, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001, 10.0, 0.00001, 10.0],
+        # 'bounds_constr_left': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.01, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001, 10.0, 0.00001, 10.0],
         },
 
     robots[1]: {
@@ -61,12 +61,12 @@ sq_grasp = {
         'displacement': [0.00, 0.00, 0.00],  # check this
         'hand_sq': [0.03, 0.06, 0.03, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         # how to set the following bounds?
-        'bounds_right': [-0.5, 0.0, -0.2, 0.2, -0.3, 0.3, -math.pi, math.pi, -math.pi, math.pi, -math.pi, math.pi],
-        'bounds_left': [-0.5, 0.0, -0.2, 0.2, -0.3, 0.3, -math.pi, math.pi, -math.pi, math.pi, -math.pi, math.pi],
-        'bounds_constr_right': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.001, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001,
-                                10.0, 0.00001, 10.0],
-        'bounds_constr_left': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.01, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001,
-                               10.0, 0.00001, 10.0],
+        'bounds_right': [[-0.5, 0.0], [-0.25, 0.25], [-0.3, 0.3], [-math.pi, math.pi], [-math.pi, math.pi], [-math.pi, math.pi]],
+        'bounds_left': [[-0.5, 0.0], [-0.25, 0.25], [-0.3, 0.3], [-math.pi, math.pi], [-math.pi, math.pi], [-math.pi, math.pi]],
+        # 'bounds_constr_right': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.001, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001,
+        #                         10.0, 0.00001, 10.0],
+        # 'bounds_constr_left': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.01, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001,
+        #                        10.0, 0.00001, 10.0],
     },
 
     robots[2]: {
@@ -77,12 +77,12 @@ sq_grasp = {
         'displacement': [0.00, 0.00, 0.003],  # check this
         'hand_sq': [0.03, 0.04, 0.03, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         # how to set the following bounds?
-        'bounds_right': [-0.7, -0.3, -0.3, 0.3, -0.2, 0.4, -math.pi, math.pi, -math.pi, math.pi, -math.pi, math.pi],
-        'bounds_left': [-0.7, -0.3, -0.3, 0.3, -0.2, 0.4, -math.pi, math.pi, -math.pi, math.pi, -math.pi, math.pi],
-        'bounds_constr_right': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.001, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001,
-                                10.0, 0.00001, 10.0],
-        'bounds_constr_left': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.01, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001,
-                               10.0, 0.00001, 10.0],
+        'bounds_right': [[-0.7, -0.3], [-0.3, 0.3], [-0.2, 0.4], [-math.pi, math.pi], [-math.pi, math.pi], [-math.pi, math.pi]],
+        'bounds_left': [[-0.7, -0.3], [-0.3, 0.3], [-0.2, 0.4], [-math.pi, math.pi], [-math.pi, math.pi], [-math.pi, math.pi]],
+        # 'bounds_constr_right': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.001, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001,
+        #                         10.0, 0.00001, 10.0],
+        # 'bounds_constr_left': [-10000, 0.0, -10000, 0.0, -10000, 0.0, 0.01, 10.0, 0.0, 1.0, 0.00001, 10.0, 0.00001,
+        #                        10.0, 0.00001, 10.0],
     }
 }
 

@@ -64,20 +64,19 @@ class pandaPushGymEnv(gym.Env):
         self.includeVelObs = includeVelObs
 
         if self._renders:
-            cid = p.connect(p.SHARED_MEMORY)
-            if cid < 0:
-                p.connect(p.GUI)
-            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.52, -0.2, -0.33])
+            self._physics_client_id = p.connect(p.SHARED_MEMORY)
+            if self._physics_client_id < 0:
+                self._physics_client_id = p.connect(p.GUI)
+            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.52, -0.2, -0.33], physicsClientId=self._physics_client_id)
         else:
-            p.connect(p.DIRECT)
+            self._physics_client_id = p.connect(p.DIRECT)
 
         # Load robot
-        self._robot = pandaEnv(use_IK=self._use_IK, basePosition=[0.2, 0, 0.625],
-                               joint_action_space=joint_action_space,
-                               includeVelObs=self.includeVelObs)
+        self._robot = pandaEnv(self._physics_client_id, use_IK=1)
 
         # Load world environment
-        self._world = WorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
+        self._world = WorldFetchEnv(self._physics_client_id,
+                                    obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                     workspace_lim=self._robot._workspace_lim)
 
         # limit robot workspace to table plane

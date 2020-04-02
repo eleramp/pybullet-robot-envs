@@ -66,20 +66,22 @@ class iCubGraspGymEnv(gym.Env):
         # Initialize PyBullet simulator
         self._p = p
         if self._renders:
-            self._cid = p.connect(p.SHARED_MEMORY)
-            if self._cid < 0:
-                self._cid = p.connect(p.GUI)
+            self._physics_client_id = p.connect(p.SHARED_MEMORY)
+            if self._physics_client_id < 0:
+                self._physics_client_id = p.connect(p.GUI)
             p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0])
         else:
-            self._cid = p.connect(p.DIRECT)
+            self._physics_client_id = p.connect(p.DIRECT)
 
         # Load robot
-        self._robot = iCubHandsEnv(use_IK=1, control_arm=self._control_arm,
+        self._robot = iCubHandsEnv(self._physics_client_id,
+                                   use_IK=1, control_arm=self._control_arm,
                                    control_orientation=self._control_orientation,
                                    control_eu_or_quat=self._control_eu_or_quat)
 
         # Load world environment
-        self._world = YcbWorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
+        self._world = YcbWorldFetchEnv(self._physics_client_id,
+                                       obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                        workspace_lim=self._robot._workspace_lim,
                                        control_eu_or_quat=self._control_eu_or_quat)
 

@@ -23,6 +23,7 @@ def get_objects_list():
 class WorldFetchEnv:
 
     def __init__(self,
+                 physicsClientId,
                  obj_name='duck_vhacd',
                  obj_pose_rnd_std=0.05,
                  workspace_lim=None,
@@ -31,6 +32,7 @@ class WorldFetchEnv:
         if workspace_lim is None:
             workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
 
+        self._physics_client_id = physicsClientId
         self._ws_lim = tuple(workspace_lim)
         self._h_table = []
         self._obj_name = obj_name
@@ -46,20 +48,21 @@ class WorldFetchEnv:
         self.reset()
 
     def reset(self):
-        p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0])
+        p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
 
         # Load table and object
         table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
-                              basePosition=[0.85, 0.0, 0.0], useFixedBase=True)
+                              basePosition=[0.85, 0.0, 0.0], useFixedBase=True, physicsClientId=self._physics_client_id)
 
-        table_info = p.getCollisionShapeData(table_id, -1)[0]
+        table_info = p.getCollisionShapeData(table_id, -1, physicsClientId=self._physics_client_id)[0]
         self._h_table = table_info[5][2] + table_info[3][2]/2
 
         # Load object. Randomize its start position if requested
         self._obj_init_pose = self._sample_pose()
         self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), self._obj_name + ".urdf"),
                                 basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
-                                 flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL)
+                                 flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
+                                 physicsClientId=self._physics_client_id)
 
     def get_object_init_pose(self):
         pos = self._obj_init_pose[:3]
@@ -70,8 +73,8 @@ class WorldFetchEnv:
         return self._h_table
 
     def get_object_shape_info(self):
-        info = list(p.getCollisionShapeData(self.obj_id, -1)[0])
-        info[4] = p.getVisualShapeData(self.obj_id, -1)[0][4]
+        info = list(p.getCollisionShapeData(self.obj_id, -1, physicsClientId=self._physics_client_id)[0])
+        info[4] = p.getVisualShapeData(self.obj_id, -1, physicsClientId=self._physics_client_id)[0][4]
         return info
 
     def get_observation_dimension(self):
@@ -83,7 +86,7 @@ class WorldFetchEnv:
         observation_lim = []
 
         # get object position
-        obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id)
+        obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id, physicsClientId=self._physics_client_id)
         observation.extend(list(obj_pos))
         observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
 
@@ -98,19 +101,19 @@ class WorldFetchEnv:
         return observation, observation_lim
 
     def set_obj_pose(self, new_pos, new_quat):
-        p.resetBasePositionAndOrientation(self.obj_id, new_pos, new_quat)
+        p.resetBasePositionAndOrientation(self.obj_id, new_pos, new_quat, physicsClientId=self._physics_client_id)
 
     def check_contact(self, link_id):
-        pts = p.getContactPoints(self.obj_id, link_id)
+        pts = p.getContactPoints(self.obj_id, link_id, physicsClientId=self._physics_client_id)
         if len(pts) > 0:
             print("<<----------->> contact with object!!!!! <<----------------->>")
             return True
         return False
 
     def debug_gui(self):
-        p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.obj_id)
-        p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.obj_id)
-        p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.obj_id)
+        p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.obj_id, physicsClientId=self._physics_client_id)
+        p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.obj_id, physicsClientId=self._physics_client_id)
+        p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.obj_id, physicsClientId=self._physics_client_id)
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -133,7 +136,9 @@ class WorldFetchEnv:
         if self._obj_pose_rnd_std > 0:
             # Add a Gaussian noise to position
             mu, sigma = 0, self._obj_pose_rnd_std
-            noise = self.np_random.normal(mu, sigma, 2)
+            # noise = self.np_random.normal(mu, sigma, 2)
+            noise = [self.np_random.uniform(low=-self._obj_pose_rnd_std, high=self._obj_pose_rnd_std),
+                     self.np_random.uniform(low=-self._obj_pose_rnd_std, high=self._obj_pose_rnd_std)]
 
             px = px + noise[0]
             px = np.clip(px, x_min, x_max)

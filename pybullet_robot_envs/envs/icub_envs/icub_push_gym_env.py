@@ -61,20 +61,24 @@ class iCubPushGymEnv(gym.Env):
         # Initialize PyBullet simulator
         self._p = p
         if self._renders:
-            self._cid = p.connect(p.SHARED_MEMORY)
-            if (self._cid<0):
-                self._cid = p.connect(p.GUI)
-            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0])
+            self._physics_client_id = p.connect(p.SHARED_MEMORY)
+
+            if self._physics_client_id < 0:
+                self._physics_client_id = p.connect(p.GUI)
+
+            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0], physicsClientId=self._physics_client_id)
             p.configureDebugVisualizer(p.COV_ENABLE_SHADOWS, 0)
         else:
-            self._cid = p.connect(p.DIRECT)
+            self._physics_client_id = p.connect(p.DIRECT)
 
         # Load robot
-        self._robot = iCubEnv(use_IK=self._use_IK, control_arm=self._control_arm,
+        self._robot = iCubEnv(self._physics_client_id,
+                              use_IK=self._use_IK, control_arm=self._control_arm,
                               control_orientation=self._control_orientation)
 
         # Load world environment
-        self._world = WorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
+        self._world = WorldFetchEnv(self._physics_client_id,
+                                    obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                     workspace_lim=self._robot._workspace_lim)
 
         # limit iCub workspace to table plane
@@ -115,22 +119,22 @@ class iCubPushGymEnv(gym.Env):
     def reset(self):
         self.terminated = 0
 
-        p.resetSimulation()
-        p.setPhysicsEngineParameter(numSolverIterations=150)
-        p.setTimeStep(self._time_step)
+        p.resetSimulation(physicsClientId=self._physics_client_id)
+        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
+        p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
         self._env_step_counter = 0
 
-        p.setGravity(0, 0, -9.8)
+        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
 
         self._robot.reset()
         # Let the world run for a bit
         for _ in range(100):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         self._world.reset()
         # Let the world run for a bit
         for _ in range(100):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         world_obs, _ = self._world.get_observation()
         self._tg_pose = self._sample_pose(world_obs[:3])
@@ -141,7 +145,7 @@ class iCubPushGymEnv(gym.Env):
 
         # Let the world run for a bit
         for _ in range(100):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
@@ -227,7 +231,7 @@ class iCubPushGymEnv(gym.Env):
                 new_action = np.add(robot_obs[-len(self._robot._motor_idxs):], action)
 
             self._robot.apply_action(new_action)
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
             time.sleep(self._time_step)
 
             if self._termination():
@@ -255,7 +259,7 @@ class iCubPushGymEnv(gym.Env):
         if mode != "rgb_array":
           return np.array([])
 
-        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id)
+        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id, physicsClientId=self._physics_client_id)
 
         cam_dist = 1.3
         cam_yaw = 180
@@ -268,15 +272,18 @@ class iCubPushGymEnv(gym.Env):
                                                                 yaw=cam_yaw,
                                                                 pitch=cam_pitch,
                                                                 roll=0,
-                                                                upAxisIndex=2)
+                                                                upAxisIndex=2,
+                                                                physicsClientId=self._physics_client_id)
 
         proj_matrix = self._p.computeProjectionMatrixFOV(fov=60, aspect=float(RENDER_WIDTH)/RENDER_HEIGHT,
-                                                         nearVal=0.1, farVal=100.0)
+                                                         nearVal=0.1, farVal=100.0,
+                                                         physicsClientId=self._physics_client_id)
 
         (_, _, px, _, _) = self._p.getCameraImage(width=RENDER_WIDTH, height=RENDER_HEIGHT,
                                                   viewMatrix=view_matrix,
                                                   projectionMatrix=proj_matrix,
-                                                  renderer=self._p.ER_BULLET_HARDWARE_OPENGL)
+                                                  renderer=self._p.ER_BULLET_HARDWARE_OPENGL,
+                                                  physicsClientId=self._physics_client_id)
                                                   #renderer=self._p.ER_TINY_RENDERER)
 
         rgb_array = np.array(px, dtype=np.uint8)
@@ -360,6 +367,9 @@ class iCubPushGymEnv(gym.Env):
         return pose
 
     def debug_gui(self):
-        p.addUserDebugLine(self._tg_pose, [self._tg_pose[0] + 0.1, self._tg_pose[1], self._tg_pose[2]], [1, 0, 0])
-        p.addUserDebugLine(self._tg_pose, [self._tg_pose[0], self._tg_pose[1] + 0.1, self._tg_pose[2]], [0, 1, 0])
-        p.addUserDebugLine(self._tg_pose, [self._tg_pose[0], self._tg_pose[1], self._tg_pose[2] + 0.1], [0, 0, 1])
+        p.addUserDebugLine(self._tg_pose, [self._tg_pose[0] + 0.1, self._tg_pose[1], self._tg_pose[2]], [1, 0, 0],
+                           physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(self._tg_pose, [self._tg_pose[0], self._tg_pose[1] + 0.1, self._tg_pose[2]], [0, 1, 0],
+                           physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(self._tg_pose, [self._tg_pose[0], self._tg_pose[1], self._tg_pose[2] + 0.1], [0, 0, 1],
+                           physicsClientId=self._physics_client_id)

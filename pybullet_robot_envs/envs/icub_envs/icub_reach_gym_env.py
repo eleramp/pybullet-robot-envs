@@ -63,20 +63,22 @@ class iCubReachGymEnv(gym.Env):
         # Initialize PyBullet simulator
         self._p = p
         if self._renders:
-            self._cid = p.connect(p.SHARED_MEMORY)
-            if self._cid < 0:
-                self._cid = p.connect(p.GUI)
-            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0])
+            self._physics_client_id = p.connect(p.SHARED_MEMORY)
+            if self._physics_client_id < 0:
+                self._physics_client_id = p.connect(p.GUI)
+            p.resetDebugVisualizerCamera(2.5, 90, -60, [0.0, -0.0, -0.0], physicsClientId=self._physics_client_id)
         else:
-            self._cid = p.connect(p.DIRECT)
+            self._physics_client_id = p.connect(p.DIRECT)
 
         # Load robot
-        self._robot = iCubHandsEnv(use_IK=1, control_arm=self._control_arm,
+        self._robot = iCubHandsEnv(self._physics_client_id,
+                                   use_IK=1, control_arm=self._control_arm,
                                    control_orientation=self._control_orientation,
                                    control_eu_or_quat=self._control_eu_or_quat)
 
         # Load world environment
-        self._world = YcbWorldFetchEnv(obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
+        self._world = YcbWorldFetchEnv(self._physics_client_id,
+                                       obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                        workspace_lim=self._robot._workspace_lim,
                                        control_eu_or_quat=self._control_eu_or_quat)
 
@@ -123,18 +125,18 @@ class iCubReachGymEnv(gym.Env):
             self._log_file[0].close()
         self._log_file[0] = open(self._log_file_path[0], "a+")
 
-        p.resetSimulation()
-        p.setPhysicsEngineParameter(numSolverIterations=150)
-        p.setTimeStep(self._time_step)
+        p.resetSimulation(physicsClientId=self._physics_client_id)
+        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
+        p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
         self._env_step_counter = 0
 
-        p.setGravity(0, 0, -9.8)
+        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
 
         self._robot.reset()
 
         # Let the world run for a bit
         for _ in range(50):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         self._robot.pre_grasp()
 
@@ -146,14 +148,14 @@ class iCubReachGymEnv(gym.Env):
 
         # Let the world run for a bit
         for _ in range(150):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         self._robot.debug_gui()
         self._world.debug_gui()
         robot_obs, _ = self._robot.get_observation()
 
         self.debug_gui()
-        p.stepSimulation()
+        p.stepSimulation(physicsClientId=self._physics_client_id)
 
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
@@ -161,8 +163,8 @@ class iCubReachGymEnv(gym.Env):
         self._t_grasp, self._t_lift = 0, 0
         self._grasp_idx = 0
 
-        self._hand_pose = self._robot._home_hand_pose[:3] + \
-                          list(p.getQuaternionFromEuler(self._robot._home_hand_pose[3:6]))
+        if self._use_IK:
+            self._hand_pose = self._robot._home_hand_pose
 
         obs, _ = self.get_extended_observation()
         return obs
@@ -247,7 +249,7 @@ class iCubReachGymEnv(gym.Env):
 
         self._robot.apply_action(new_action_pos.tolist() + new_action_quat_1)
         for _ in range(self._action_repeat):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
             time.sleep(self._time_step)
             if self._termination():
                 break
@@ -279,7 +281,7 @@ class iCubReachGymEnv(gym.Env):
         if mode != "rgb_array":
             return np.array([])
 
-        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id)
+        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id, physicsClientId=self._physics_client_id)
 
         cam_dist = 1.3
         cam_yaw = 180
@@ -292,15 +294,18 @@ class iCubReachGymEnv(gym.Env):
                                                                 yaw=cam_yaw,
                                                                 pitch=cam_pitch,
                                                                 roll=0,
-                                                                upAxisIndex=2)
+                                                                upAxisIndex=2,
+                                                                physicsClientId=self._physics_client_id)
 
         proj_matrix = self._p.computeProjectionMatrixFOV(fov=60, aspect=float(RENDER_WIDTH) / RENDER_HEIGHT,
-                                                         nearVal=0.1, farVal=100.0)
+                                                         nearVal=0.1, farVal=100.0,
+                                                         physicsClientId=self._physics_client_id)
 
         (_, _, px, _, _) = self._p.getCameraImage(width=RENDER_WIDTH, height=RENDER_HEIGHT,
                                                   viewMatrix=view_matrix,
                                                   projectionMatrix=proj_matrix,
-                                                  renderer=self._p.ER_BULLET_HARDWARE_OPENGL)
+                                                  renderer=self._p.ER_BULLET_HARDWARE_OPENGL,
+                                                  physicsClientId=self._physics_client_id)
         # renderer=self._p.ER_TINY_RENDERER)
 
         rgb_array = np.array(px, dtype=np.uint8)
@@ -318,7 +323,7 @@ class iCubReachGymEnv(gym.Env):
         w_obs, _ = self._world.get_observation()
 
         if self._control_eu_or_quat is 1:
-            eu = p.getEulerFromQuaternion(w_obs[3:7])
+            eu = p.getEulerFromQuaternion(w_obs[3:7], physicsClientId=self._physics_client_id)
         else:
             eu = w_obs[3:6]
 

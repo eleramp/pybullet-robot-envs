@@ -17,9 +17,10 @@ from pybullet_robot_envs.envs.utils import goal_distance
 
 class pandaEnv:
 
-    def __init__(self, use_IK=0, base_position=(0.0, 0, 0.625), joint_action_space=7, includeVelObs = True,
+    def __init__(self, physicsClientId, use_IK=0, base_position=(0.0, 0, 0.625), joint_action_space=7, includeVelObs = True,
                  control_eu_or_quat=0):
 
+        self._physics_client_id = physicsClientId
         self._use_IK = use_IK
         self._control_orientation = 1
         self._use_simulation = 1
@@ -48,17 +49,18 @@ class pandaEnv:
         # load robot
         flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_INERTIA_FROM_FILE
         self.robot_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "franka_panda/panda.urdf"),
-                                  basePosition=self._base_position, useFixedBase=True, flags=flags)
+                                   basePosition=self._base_position, useFixedBase=True, flags=flags,
+                                   physicsClientId=self._physics_client_id)
 
         # reset joints to home position
-        num_joints = p.getNumJoints(self.robot_id)
+        num_joints = p.getNumJoints(self.robot_id, physicsClientId=self._physics_client_id)
         idx = 0
         self._motor_idxs = []
         for i in range(num_joints):
-            jointInfo = p.getJointInfo(self.robot_id, i)
+            jointInfo = p.getJointInfo(self.robot_id, i, physicsClientId=self._physics_client_id)
             jointType = jointInfo[2]
             if jointType is p.JOINT_REVOLUTE or jointType is p.JOINT_PRISMATIC:
-                p.resetJointState(self.robot_id, i, self._home_pos_joints[idx])
+                p.resetJointState(self.robot_id, i, self._home_pos_joints[idx], physicsClientId=self._physics_client_id)
                 self._motor_idxs.append(i)
                 idx += 1
 
@@ -78,26 +80,26 @@ class pandaEnv:
                                     min(m.pi, max(-m.pi, 0))]
 
             self.apply_action(self._home_hand_pose)
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         self.debug_gui()
 
     def delete_simulated_robot(self):
         # Remove the robot from the simulation
-        p.removeBody(self.robot_id)
+        p.removeBody(self.robot_id, physicsClientId=self._physics_client_id)
 
     def get_joint_ranges(self):
         lower_limits, upper_limits, joint_ranges, rest_poses = [], [], [], []
 
-        for i in range(p.getNumJoints(self.robot_id)):
-            jointInfo = p.getJointInfo(self.robot_id, i)
+        for i in range(p.getNumJoints(self.robot_id, physicsClientId=self._physics_client_id)):
+            jointInfo = p.getJointInfo(self.robot_id, i, physicsClientId=self._physics_client_id)
             jointType = jointInfo[2]
 
             if jointType is p.JOINT_REVOLUTE or jointType is p.JOINT_PRISMATIC:
                 ll, ul = jointInfo[8:10]
                 jr = ul - ll
                 # For simplicity, assume resting state == initial state
-                rp = p.getJointState(self.robot_id, i)[0]
+                rp = p.getJointState(self.robot_id, i, physicsClientId=self._physics_client_id)[0]
                 lower_limits.append(ll)
                 upper_limits.append(ul)
                 joint_ranges.append(jr)
@@ -121,7 +123,7 @@ class pandaEnv:
         observation = []
         observation_lim = []
         state = p.getLinkState(self.robot_id, self.endEffLink, computeLinkVelocity=1,
-                               computeForwardKinematics=1)
+                               computeForwardKinematics=1, physicsClientId=self._physics_client_id)
         pos = state[0]
         orn = state[1]
 
@@ -148,7 +150,7 @@ class pandaEnv:
             observation.extend(list(vel_a))
             observation_lim.extend([[-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi]])
 
-        jointStates = p.getJointStates(self.robot_id, self._motor_idxs)
+        jointStates = p.getJointStates(self.robot_id, self._motor_idxs, physicsClientId=self._physics_client_id)
         jointPoses = [x[0] for x in jointStates]
 
         observation.extend(list(jointPoses))
@@ -159,9 +161,9 @@ class pandaEnv:
     def pre_grasp(self):
         self.apply_action_fingers((0.04, 0.04))
         for _ in range(0,10):
-            p.stepSimulation()
-        f1 = p.getLinkState(self.robot_id, self._motor_idxs[-2])[0]
-        f2 = p.getLinkState(self.robot_id, self._motor_idxs[-1])[0]
+            p.stepSimulation(physicsClientId=self._physics_client_id)
+        f1 = p.getLinkState(self.robot_id, self._motor_idxs[-2], physicsClientId=self._physics_client_id)[0]
+        f2 = p.getLinkState(self.robot_id, self._motor_idxs[-1], physicsClientId=self._physics_client_id)[0]
         print("------>>> FINGER DISTANCE {}".format(goal_distance(np.array(f1), np.array(f2))))
 
     def apply_action_fingers(self, action):
@@ -172,7 +174,8 @@ class pandaEnv:
                                     i,
                                     p.POSITION_CONTROL,
                                     targetPosition=action[0],
-                                    force=10)
+                                    force=10,
+                                    physicsClientId=self._physics_client_id)
 
     def apply_action(self, action):
 
@@ -204,31 +207,33 @@ class pandaEnv:
                 new_quat_orn = action[3:7]
 
             else:
-                new_quat_orn = p.getLinkState(self.robot_id, self.endEffLink)[5]
+                new_quat_orn = p.getLinkState(self.robot_id, self.endEffLink, physicsClientId=self._physics_client_id)[5]
 
             jointPoses = p.calculateInverseKinematics(self.robot_id, self.endEffLink, new_pos, new_quat_orn,
                                                       maxNumIterations=100,
-                                                      residualThreshold=.001)
+                                                      residualThreshold=.001,
+                                                      physicsClientId=self._physics_client_id)
             jointPoses = np.multiply(1, jointPoses)
             if self._use_simulation:
                     for i in range(self._num_dof):
-                        jointInfo = p.getJointInfo(self.robot_id, i)
+                        jointInfo = p.getJointInfo(self.robot_id, i, physicsClientId=self._physics_client_id)
                         if jointInfo[3] > -1:
                             p.setJointMotorControl2(bodyUniqueId=self.robot_id,
                                                     jointIndex=i,
                                                     controlMode=p.POSITION_CONTROL,
                                                     targetPosition=jointPoses[i],
                                                     targetVelocity=0,
-                                                    force=500)
+                                                    force=500,
+                                                    physicsClientId=self._physics_client_id)
             else:
                 for i in range(self._num_dof):
-                    p.resetJointState(self.robot_id, i, jointPoses[i])
+                    p.resetJointState(self.robot_id, i, jointPoses[i], physicsClientId=self._physics_client_id)
 
         else:
             assert len(action) == self.joint_action_space, ('number of motor commands differs from number of motor to control', len(action))
 
             for a in range(len(action)):
-                curr_motor_pos = p.getJointState(self.robot_id, a)[0]
+                curr_motor_pos = p.getJointState(self.robot_id, a, physicsClientId=self._physics_client_id)[0]
                 new_motor_pos = curr_motor_pos + action[a]  # supposed to be a delta
 
                 p.setJointMotorControl2(self.robot_id,
@@ -236,11 +241,12 @@ class pandaEnv:
                                         p.POSITION_CONTROL,
                                         targetPosition=new_motor_pos,
                                         targetVelocity=0,
-                                        force=500)
+                                        force=500,
+                                        physicsClientId=self._physics_client_id)
 
     def check_contact_fingertips(self, obj_id):
-        p0 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=self._motor_idxs[-2])
-        p1 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=self._motor_idxs[-1])
+        p0 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=self._motor_idxs[-2], physicsClientId=self._physics_client_id)
+        p1 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=self._motor_idxs[-1], physicsClientId=self._physics_client_id)
 
         fingers_in_contact = 0
 
@@ -276,21 +282,21 @@ class pandaEnv:
         p3 = [ws[0][1], ws[1][1], ws[2][0]]  # xmax,ymax
         p4 = [ws[0][0], ws[1][1], ws[2][0]]  # xmin,ymax
 
-        p.addUserDebugLine(p1, p2, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0)
-        p.addUserDebugLine(p2, p3, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0)
-        p.addUserDebugLine(p3, p4, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0)
-        p.addUserDebugLine(p4, p1, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0)
+        p.addUserDebugLine(p1, p2, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0, physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(p2, p3, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0, physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(p3, p4, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0, physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(p4, p1, lineColorRGB=[0, 0, 1], lineWidth=2.0, lifeTime=0, physicsClientId=self._physics_client_id)
 
         p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=-1)
+                           parentLinkIndex=-1, physicsClientId=self._physics_client_id)
         p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=-1)
+                           parentLinkIndex=-1, physicsClientId=self._physics_client_id)
         p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=-1)
+                           parentLinkIndex=-1, physicsClientId=self._physics_client_id)
 
         p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self.endEffLink)
+                           parentLinkIndex=self.endEffLink, physicsClientId=self._physics_client_id)
         p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self.endEffLink)
+                           parentLinkIndex=self.endEffLink, physicsClientId=self._physics_client_id)
         p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self.endEffLink)
+                           parentLinkIndex=self.endEffLink, physicsClientId=self._physics_client_id)
