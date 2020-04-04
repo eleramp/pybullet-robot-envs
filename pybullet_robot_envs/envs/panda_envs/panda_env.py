@@ -73,10 +73,10 @@ class pandaEnv:
                                     -2/3*m.pi, -m.pi/4, 0]  # x,y,z,roll,pitch,yaw
 
             self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._base_position[0] + 0.2)),
-                                    min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], self._base_position[1] - 0.2)),
+                                    min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], self._base_position[1])),
                                     min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._base_position[2] + 0.4)),
-                                    min(m.pi, max(-m.pi, -2/3*m.pi)),
-                                    min(m.pi, max(-m.pi, -m.pi/4)),
+                                    min(m.pi, max(-m.pi, m.pi)),
+                                    min(m.pi, max(-m.pi, 0)),
                                     min(m.pi, max(-m.pi, 0))]
 
             self.apply_action(self._home_hand_pose)
@@ -164,7 +164,6 @@ class pandaEnv:
             p.stepSimulation(physicsClientId=self._physics_client_id)
         f1 = p.getLinkState(self.robot_id, self._motor_idxs[-2], physicsClientId=self._physics_client_id)[0]
         f2 = p.getLinkState(self.robot_id, self._motor_idxs[-1], physicsClientId=self._physics_client_id)[0]
-        print("------>>> FINGER DISTANCE {}".format(goal_distance(np.array(f1), np.array(f2))))
 
     def apply_action_fingers(self, action):
         assert len(action) == 2, ('finger joints are 2! The number of actions you passed is ', len(action))
@@ -223,6 +222,7 @@ class pandaEnv:
                                                     controlMode=p.POSITION_CONTROL,
                                                     targetPosition=jointPoses[i],
                                                     targetVelocity=0,
+                                                    maxVelocity=2,
                                                     force=500,
                                                     physicsClientId=self._physics_client_id)
             else:

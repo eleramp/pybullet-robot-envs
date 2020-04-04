@@ -9,9 +9,8 @@ import math as m
 import quaternion
 
 from pybullet_robot_envs.envs.panda_envs.panda_env import pandaEnv
-from pybullet_robot_envs.envs.icub_envs.icub_env import iCubEnv
 from pybullet_robot_envs.envs.world_envs.ycb_fetch_env import get_ycb_objects_list, YcbWorldFetchEnv
-from pybullet_robot_envs.envs.icub_envs.superq_grasp_planner import SuperqGraspPlanner
+from pybullet_robot_envs.envs.panda_envs.superq_grasp_planner import SuperqGraspPlanner
 from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication, axis_angle_to_quaternion, quaternion_to_axis_angle
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -42,7 +41,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._control_orientation = control_orientation
         self._control_eu_or_quat = control_eu_or_quat
         self._action_repeat = action_repeat
-        self._n_control_pt = n_control_pt
+        self._n_control_pt = n_control_pt+1
         self._observation = []
         self._r_weights = r_weights
 
@@ -82,8 +81,12 @@ class PandaGraspResidualGymEnv(gym.Env):
         else:
             self._physics_client_id = p.connect(p.DIRECT)
 
+        self._traj_client_id = p.connect(p.DIRECT)
+
         # Load robot
         self._robot = pandaEnv(self._physics_client_id, use_IK=1)
+
+        self._robot_traj = pandaEnv(self._traj_client_id, use_IK=1)
 
         # Load world environment
         if self._obj_name is None:
@@ -97,7 +100,8 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         # Load base controller
         self._base_controller = SuperqGraspPlanner(self._physics_client_id,
-                                                   self._robot.robot_id, self._world.obj_id, robot_name='panda',
+                                                   self._traj_client_id,
+                                                   self._robot_traj, self._world.obj_id, robot_name='panda',
                                                    render=self._renders,
                                                    grasping_hand='r',
                                                    noise_pcl=self._noise_pcl)
@@ -140,9 +144,9 @@ class PandaGraspResidualGymEnv(gym.Env):
     def reset(self):
         if DO_LOGGING:
             if self.logId is not None:
-                p.stopStateLogging(self.logId)
+                p.stopStateLogging(self.logId, physicsClientId=self._physics_client_id)
             if self.logId_ct is not None:
-                p.stopStateLogging(self.logId_ct)
+                p.stopStateLogging(self.logId_ct, physicsClientId=self._physics_client_id)
             print("logging closed")
 
             if not self._log_file[0].closed:
@@ -153,18 +157,26 @@ class PandaGraspResidualGymEnv(gym.Env):
                 self._log_file[1].close()
             self._log_file[1] = open(self._log_file_path[1], "a+")
 
-        p.resetSimulation()
-        p.setPhysicsEngineParameter(numSolverIterations=150)
-        p.setTimeStep(self._time_step)
+        p.resetSimulation(physicsClientId=self._physics_client_id)
+        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
+        p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
+
+        p.resetSimulation(physicsClientId=self._traj_client_id)
+        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._traj_client_id)
+        p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
+
         self._env_step_counter = 0
 
-        p.setGravity(0, 0, -9.8)
+        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
+        p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
 
         self._robot.reset()
+        self._robot_traj.reset()
 
         # Let the world run for a bit
         for _ in range(50):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
+            p.stepSimulation(physicsClientId=self._traj_client_id)
             if self._renders:
                 time.sleep(self._time_step)
 
@@ -178,7 +190,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._world.reset()
         # Let the world run for a bit
         for _ in range(200):
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
             if self._renders:
                 time.sleep(self._time_step)
 
@@ -187,17 +199,21 @@ class PandaGraspResidualGymEnv(gym.Env):
         robot_obs, _ = self._robot.get_observation()
 
         # if self._first_call:
-        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
+        self._base_controller.reset(obj_id=self._world.obj_id,
                                     starting_pose=self._robot._home_hand_pose, n_control_pt=self._n_control_pt)
 
-        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
+        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id, physicsClientId=self._physics_client_id))
 
-        self.compute_grasp_pose()
+        ok = self.compute_grasp_pose()
 
-        self._base_controller.compute_approach_path()
+        if ok:
+            self._base_controller.compute_approach_path()
+            base_action, _ = self._base_controller.get_next_action()
+            self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
 
         self.debug_gui()
-        p.stepSimulation()
+        for _ in range(600):
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
@@ -213,10 +229,12 @@ class PandaGraspResidualGymEnv(gym.Env):
         if DO_LOGGING:
             print("------------------------>>>>>start logging")
 
-            self.logId = p.startStateLogging(p.STATE_LOGGING_GENERIC_ROBOT, "log_successful_grasp.bin")
+            self.logId = p.startStateLogging(p.STATE_LOGGING_GENERIC_ROBOT, "log_successful_grasp.bin",
+                                             physicsClientId=self._physics_client_id)
             self.logId_ct = p.startStateLogging(p.STATE_LOGGING_CONTACT_POINTS, "log_successful_grasp_ct.bin",
                                                 bodyUniqueIdA=self._robot.robot_id,
-                                                bodyUniqueIdB=self._world.obj_id)
+                                                bodyUniqueIdB=self._world.obj_id,
+                                                physicsClientId=self._physics_client_id)
 
         return obs
 
@@ -234,17 +252,20 @@ class PandaGraspResidualGymEnv(gym.Env):
         ok = self._base_controller.compute_object_pointcloud(obj_pose)
         if not ok:
             print("Can't get good point cloud of the object")
-            return self.reset()
+            self.reset()
+            return False
 
         ok = self._base_controller.estimate_superq()
         if not ok:
             print("can't compute good superquadrics")
-            return self.reset()
+            self.reset()
+            return False
 
         ok = self._base_controller.estimate_grasp()
         if not ok:
             print("can't compute any grasp pose")
-            return self.reset()
+            self.reset()
+            return False
 
         self._superqs = self._base_controller.get_superqs()
         self._grasp_pose = self._base_controller.get_grasp_pose()
@@ -254,7 +275,9 @@ class PandaGraspResidualGymEnv(gym.Env):
         print("grasp pose: {}".format(self._grasp_pose))
 
         if self._renders:
-            self._base_controller._visualizer.visualize()
+            self._base_controller._visualizer.render()
+
+        return True
 
     def get_extended_observation(self):
         self._observation = []
@@ -278,6 +301,7 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         # get superquadric params of dimension and shape
         if self._use_superq:
+
             # get superquadric params
             sq_pos = [self._superqs[0].center[0][0], self._superqs[0].center[1][0], self._superqs[0].center[2][0]]
             sq_quat = axis_angle_to_quaternion((self._superqs[0].axisangle[0][0], self._superqs[0].axisangle[1][0],
@@ -399,7 +423,7 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         for _ in range(self._action_repeat):
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
-            p.stepSimulation()
+            p.stepSimulation(physicsClientId=self._physics_client_id)
             if self._renders:
                 time.sleep(self._time_step)
 
@@ -445,7 +469,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         if mode != "rgb_array":
             return np.array([])
 
-        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id)
+        base_pos, _ = self._p.getBasePositionAndOrientation(self._robot.robot_id, physicsClientId=self._physics_client_id)
 
         cam_dist = 1.3
         cam_yaw = 180
@@ -458,15 +482,18 @@ class PandaGraspResidualGymEnv(gym.Env):
                                                                 yaw=cam_yaw,
                                                                 pitch=cam_pitch,
                                                                 roll=0,
-                                                                upAxisIndex=2)
+                                                                upAxisIndex=2,
+                                                                physicsClientId=self._physics_client_id)
 
         proj_matrix = self._p.computeProjectionMatrixFOV(fov=60, aspect=float(RENDER_WIDTH) / RENDER_HEIGHT,
-                                                         nearVal=0.1, farVal=100.0)
+                                                         nearVal=0.1, farVal=100.0,
+                                                         physicsClientId=self._physics_client_id)
 
         (_, _, px, _, _) = self._p.getCameraImage(width=RENDER_WIDTH, height=RENDER_HEIGHT,
                                                   viewMatrix=view_matrix,
                                                   projectionMatrix=proj_matrix,
-                                                  renderer=self._p.ER_BULLET_HARDWARE_OPENGL)
+                                                  renderer=self._p.ER_BULLET_HARDWARE_OPENGL,
+                                                  physicsClientId=self._physics_client_id)
         # renderer=self._p.ER_TINY_RENDERER)
 
         rgb_array = np.array(px, dtype=np.uint8)
@@ -564,9 +591,9 @@ class PandaGraspResidualGymEnv(gym.Env):
         pay = np_pose + np.array(list(dcm.dot([0, 0.1, 0])))
         paz = np_pose + np.array(list(dcm.dot([0, 0, 0.1])))
 
-        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0])
-        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0])
-        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1])
+        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0], physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0], physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1], physicsClientId=self._physics_client_id)
 
         pose = self._grasp_pose[:3]
 
@@ -577,9 +604,9 @@ class PandaGraspResidualGymEnv(gym.Env):
         pay = np_pose + np.array(list(dcm.dot([0, 0.1, 0])))
         paz = np_pose + np.array(list(dcm.dot([0, 0, 0.1])))
 
-        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0])
-        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0])
-        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1])
+        p.addUserDebugLine(pose, pax.tolist(), [1, 0, 0], physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(pose, pay.tolist(), [0, 1, 0], physicsClientId=self._physics_client_id)
+        p.addUserDebugLine(pose, paz.tolist(), [0, 0, 1], physicsClientId=self._physics_client_id)
 
     def dump_data(self, data):
         if len(data) is 2:
