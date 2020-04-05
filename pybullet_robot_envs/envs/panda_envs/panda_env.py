@@ -222,7 +222,7 @@ class pandaEnv:
                                                     controlMode=p.POSITION_CONTROL,
                                                     targetPosition=jointPoses[i],
                                                     targetVelocity=0,
-                                                    maxVelocity=2,
+                                                    maxVelocity=1,
                                                     force=500,
                                                     physicsClientId=self._physics_client_id)
             else:

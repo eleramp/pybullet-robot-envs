@@ -241,10 +241,10 @@ class SuperqGraspPlanner:
             return False
 
         sq_hand = grasp_res_hand.hand_superq
-        # pointcloud = PointCloud()
-        # points = superquadric_bindings.vector_deque_Vector3d()
-        # points = grasp_res_hand.points_on[0]
-        # pointcloud.setPoints(points)
+        pointcloud = PointCloud()
+        points = superquadric_bindings.vector_deque_Vector3d()
+        points = grasp_res_hand.points_on[0]
+        pointcloud.setPoints(points)
 
         # visualize them
         if self._render:
@@ -252,7 +252,7 @@ class SuperqGraspPlanner:
             self._visualizer.addPoses(grasp_res_hand.grasp_poses)
             self._visualizer.addPlane(self._grasp_estimator.getPlaneHeight())
             self._visualizer.addSuperqHands(sq_hand)
-            # self._visualizer.addPointsHands(pointcloud)
+            self._visualizer.addPointsHands(pointcloud)
 
         # ------> Estimate pose cost <-------- #
         # TODO: Compute pose hat
@@ -263,6 +263,8 @@ class SuperqGraspPlanner:
 
         # ------> Select best pose <-------- #
         best_grasp_pose = grasp_res_hand.grasp_poses[grasp_res_hand.best_pose]
+
+        # print(" grasp pose axes {}".format(best_grasp_pose.axes))
 
         if self._grasping_hand is 'r' and self._render:
             self._visualizer.highlightBestPose("right", "right", grasp_res_hand.best_pose)
@@ -335,8 +337,8 @@ class SuperqGraspPlanner:
         state = p.getLinkState(self._robot.robot_id, self._robot.endEffLink,
                                computeForwardKinematics=1, physicsClientId=self._traj_client_id)
         err_traj = 0.01
-
-        while goal_distance(np.array(state[0]), np.array(grasp_pose[:3])) >= err_traj:
+        count = 0
+        while goal_distance(np.array(state[0]), np.array(grasp_pose[:3])) >= err_traj and count <= 10e2:
             self._robot.apply_action(grasp_pose)
             p.stepSimulation(self._traj_client_id)
             state = p.getLinkState(self._robot.robot_id, self._robot.endEffLink,
@@ -350,10 +352,13 @@ class SuperqGraspPlanner:
                 if n_via_points is 0:
                     break
 
+            count += 1
+
+        if count > 100 and len(self._approach_path) < self._n_control_pt:
+            return False
+
         self._approach_path.append((grasp_pose[:3], grasp_pose[3:7]))
-
         self._debug_gui(self._approach_path)
-
         self._approach_path.reverse()
         return True
 

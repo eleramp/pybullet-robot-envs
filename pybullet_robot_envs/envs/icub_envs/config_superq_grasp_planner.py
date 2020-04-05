@@ -74,7 +74,7 @@ sq_grasp = {
         'constr_tol': 1e-4,
         'max_superq': 1,
         'plane_table': [0.0, 0.0, 1.0, 0.05],  # check this
-        'displacement': [0.00, 0.00, 0.003],  # check this
+        'displacement': [0.00, 0.00, 0.00],  # check this
         'hand_sq': [0.03, 0.05, 0.03, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         # how to set the following bounds?
         'bounds_right': [[-0.7, -0.3], [-0.3, 0.3], [-0.2, 0.4], [-math.pi, math.pi], [-math.pi, math.pi], [-math.pi, math.pi]],

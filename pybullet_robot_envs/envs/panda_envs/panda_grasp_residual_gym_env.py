@@ -409,18 +409,6 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         final_action_quat = quat_multiplication(np.array(base_action[1]), np.array(quat_action))
 
-        if self.last_approach_step and self._grasping_step > 0:
-            # move fingers
-            action_f = np.add([0.01, 0.1], action[-2:])
-            self._robot.apply_action_fingers(action_f)
-            # n_step = 20
-            self._grasping_step -= 1
-
-        elif self.last_approach_step and self._grasping_step <= 0:
-            # do lift
-            final_action_pos[2] += 0.12
-            self._env_step_counter = self._max_steps - self._action_repeat + 1
-
         for _ in range(self._action_repeat):
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
             p.stepSimulation(physicsClientId=self._physics_client_id)
@@ -432,7 +420,33 @@ class PandaGraspResidualGymEnv(gym.Env):
             w_obs, _ = self._world.get_observation()
             if self._termination(w_obs):
                 break
-            self._env_step_counter += 1
+
+        self._grasping_step = 5
+        if self.last_approach_step:
+            while self._grasping_step > 0:
+                # move fingers
+                action_f = np.add([-0.05, 0.05], action[-2:])
+                self._robot.apply_action_fingers(action_f)
+                p.stepSimulation(physicsClientId=self._physics_client_id)
+                # n_step = 20
+                self._grasping_step -= 1
+
+            # do lift
+            final_action_pos[2] += 0.2
+
+            for _ in range(self._action_repeat):
+                self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
+                p.stepSimulation(physicsClientId=self._physics_client_id)
+                if self._renders:
+                    time.sleep(self._time_step)
+
+                self._env_step_counter += 1
+
+                w_obs, _ = self._world.get_observation()
+                if self._termination(w_obs):
+                    break
+
+            self._env_step_counter = self._max_steps+1
 
         # dump data
         if DO_LOGGING:
@@ -537,7 +551,7 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         # cost 1: object touched
         if self._world.check_contact(self._robot.robot_id) and not self.last_approach_step:
-            c1 = np.float32(2.0)
+            c1 = np.float32(5.0)
 
         # cost 2: object falls
         if self._control_eu_or_quat is 1:
