@@ -21,15 +21,16 @@ def main():
     env = PandaGraspResidualGymEnv(obj_pose_rnd_std=0.05, renders=True, obj_name=1, n_control_pt=2)
     motorsIds = []
 
-    dv = 1
+    dv = 0.05
+    dvo = 1.57
     motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
     motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
     motorsIds.append(env._p.addUserDebugParameter("lhPosZ", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", 0, 0.04, 0.04))
-    motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", 0, 0.04, 0.04))
+    motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dvo, dvo, 0.0))
+    motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dvo, dvo, 0.0))
+    motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dvo, dvo, 0.0))
+    # motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", -0.01, 0.01, 0.04))
+    # motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", 0, 0.04, 0.04))
 
 
     done = False
@@ -40,12 +41,12 @@ def main():
         for motorId in motorsIds:
             action.append(env._p.readUserDebugParameter(motorId))
 
-        action = int(action[0])
+        # action = int(action[0])
 
         #print(env.step(action))
 
         state, reward, done, _ = env.step(action)
-        if t%10==0:
+        if t%1==0:
             print("reward ", reward)
             print("done ", done)
         if done:

@@ -39,7 +39,8 @@ class WorldFetchEnv:
         self._obj_pose_rnd_std = obj_pose_rnd_std
         self._obj_init_pose = []
 
-        self.obj_id = []
+        self.obj_id = None
+        self.table_id = None
 
         self._control_eu_or_quat = control_eu_or_quat
 
@@ -51,10 +52,10 @@ class WorldFetchEnv:
         p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
 
         # Load table and object
-        table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
+        self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
                               basePosition=[0.85, 0.0, 0.0], useFixedBase=True, physicsClientId=self._physics_client_id)
 
-        table_info = p.getCollisionShapeData(table_id, -1, physicsClientId=self._physics_client_id)[0]
+        table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
         self._h_table = table_info[5][2] + table_info[3][2]/2
 
         # Load object. Randomize its start position if requested
@@ -107,6 +108,13 @@ class WorldFetchEnv:
         pts = p.getContactPoints(self.obj_id, link_id, physicsClientId=self._physics_client_id)
         if len(pts) > 0:
             print("<<----------->> contact with object!!!!! <<----------------->>")
+            return True
+        return False
+
+    def check_table_contact(self, link_id):
+        pts = p.getContactPoints(self.table_id, link_id, physicsClientId=self._physics_client_id)
+        if len(pts) > 0:
+            print("<<----------->> contact with table!!!!! <<----------------->>")
             return True
         return False
 

@@ -53,7 +53,8 @@ class YcbWorldFetchEnv(WorldFetchEnv):
         self._obj_pose_rnd_std = obj_pose_rnd_std
         self._obj_init_pose = []
 
-        self.obj_id = []
+        self.obj_id = None
+        self.table_id = None
 
         self._control_eu_or_quat = control_eu_or_quat
 
@@ -65,9 +66,9 @@ class YcbWorldFetchEnv(WorldFetchEnv):
         p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
 
         # Load table and object
-        table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"), [0.85, 0.0, 0.0], physicsClientId=self._physics_client_id)
+        self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"), [0.85, 0.0, 0.0], physicsClientId=self._physics_client_id)
 
-        table_info = p.getCollisionShapeData(table_id, -1, physicsClientId=self._physics_client_id)[0]
+        table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
         self._h_table = table_info[5][2] + table_info[3][2]/2
 
         # Load object. Randomize its start position if requested
