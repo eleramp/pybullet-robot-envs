@@ -24,14 +24,14 @@ class PandaGraspResidualGymEnv(gym.Env):
 
     def __init__(self,
                  log_file=os.path.join(currentdir),
-                 action_repeat=30,
+                 action_repeat=40,
                  control_orientation=1,
                  control_eu_or_quat=0,
                  obj_name=None,
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
                  renders=False,
-                 max_steps=1000,
+                 max_steps=500,
                  use_superq=1,
                  n_control_pt=2,
                  r_weights=(-5, -10, 10)):
@@ -58,7 +58,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._noise_pcl = noise_pcl
         self._last_frame_time = 0
         self._use_superq = use_superq
-        self._distance_threshold = 0.03
+        self._distance_threshold = 0.1
 
         self._log_file = []
         self._log_file_path = []
@@ -135,8 +135,8 @@ class PandaGraspResidualGymEnv(gym.Env):
         observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
 
         # Configure action space
-        action_high = np.array([0.05, 0.05, 0.05, 0.2, 0.2, 0.3])
-        action_low = np.array([-0.05, -0.05, -0.05, -0.2, -0.2, -0.3])
+        action_high = np.array([0.08, 0.08, 0.08, 0.2, 0.2, 0.7])
+        action_low = np.array([-0.08, -0.08, -0.08, -0.2, -0.2, -0.7])
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space

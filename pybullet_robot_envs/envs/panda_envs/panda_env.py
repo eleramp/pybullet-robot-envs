@@ -176,7 +176,7 @@ class pandaEnv:
                                     force=10,
                                     physicsClientId=self._physics_client_id)
 
-    def apply_action(self, action):
+    def apply_action(self, action, max_vel=1):
 
         if self._use_IK:
             if not (len(action) == 3 or len(action) == 6 or len(action) == 7):
@@ -222,7 +222,7 @@ class pandaEnv:
                                                     controlMode=p.POSITION_CONTROL,
                                                     targetPosition=jointPoses[i],
                                                     targetVelocity=0,
-                                                    maxVelocity=1,
+                                                    maxVelocity=max_vel,
                                                     force=500,
                                                     physicsClientId=self._physics_client_id)
             else:
