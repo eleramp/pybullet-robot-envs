@@ -67,14 +67,10 @@ class pandaEnv:
         self.ll, self.ul, self.jr, self.rs = self.get_joint_ranges()
 
         if self._use_IK:
-            self._home_hand_pose = [self._base_position[0] + 0.2,
-                                    self._base_position[1] - 0.2,
-                                    self._base_position[2] + 0.4,
-                                    -2/3*m.pi, -m.pi/4, 0]  # x,y,z,roll,pitch,yaw
 
-            self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._base_position[0] + 0.2)),
+            self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._base_position[0] + 0.1)),
                                     min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], self._base_position[1])),
-                                    min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._base_position[2] + 0.4)),
+                                    min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._base_position[2] + 0.6)),
                                     min(m.pi, max(-m.pi, m.pi)),
                                     min(m.pi, max(-m.pi, 0)),
                                     min(m.pi, max(-m.pi, 0))]
