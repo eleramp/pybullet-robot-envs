@@ -9,6 +9,7 @@ os.sys.path.insert(0, currentdir)
 import pybullet as p
 import pybullet_data
 from gym.utils import seeding
+from icub_model_pybullet import franka_panda
 
 import numpy as np
 import math as m
@@ -48,7 +49,7 @@ class pandaEnv:
     def reset(self):
         # load robot
         flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_INERTIA_FROM_FILE
-        self.robot_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "franka_panda/panda.urdf"),
+        self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda_model.urdf"),
                                    basePosition=self._base_position, useFixedBase=True, flags=flags,
                                    physicsClientId=self._physics_client_id)
 
@@ -68,11 +69,11 @@ class pandaEnv:
 
         if self._use_IK:
 
-            self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._base_position[0] + 0.1)),
+            self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._base_position[0])),
                                     min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], self._base_position[1])),
-                                    min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._base_position[2] + 0.6)),
+                                    min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._base_position[2] + 0.5)),
                                     min(m.pi, max(-m.pi, m.pi)),
-                                    min(m.pi, max(-m.pi, 0)),
+                                    min(m.pi, max(-m.pi, -m.pi/4)),
                                     min(m.pi, max(-m.pi, 0))]
 
             self.apply_action(self._home_hand_pose)
@@ -172,7 +173,7 @@ class pandaEnv:
                                     force=10,
                                     physicsClientId=self._physics_client_id)
 
-    def apply_action(self, action, max_vel=1):
+    def apply_action(self, action, max_vel=None):
 
         if self._use_IK:
             if not (len(action) == 3 or len(action) == 6 or len(action) == 7):
@@ -213,14 +214,23 @@ class pandaEnv:
                     for i in range(self._num_dof):
                         jointInfo = p.getJointInfo(self.robot_id, i, physicsClientId=self._physics_client_id)
                         if jointInfo[3] > -1:
-                            p.setJointMotorControl2(bodyUniqueId=self.robot_id,
-                                                    jointIndex=i,
-                                                    controlMode=p.POSITION_CONTROL,
-                                                    targetPosition=jointPoses[i],
-                                                    targetVelocity=0,
-                                                    maxVelocity=max_vel,
-                                                    force=500,
-                                                    physicsClientId=self._physics_client_id)
+                            if max_vel:
+                                p.setJointMotorControl2(bodyUniqueId=self.robot_id,
+                                                        jointIndex=i,
+                                                        controlMode=p.POSITION_CONTROL,
+                                                        targetPosition=jointPoses[i],
+                                                        targetVelocity=0,
+                                                        maxVelocity=max_vel,
+                                                        force=500,
+                                                        physicsClientId=self._physics_client_id)
+                            else:
+                                p.setJointMotorControl2(bodyUniqueId=self.robot_id,
+                                                        jointIndex=i,
+                                                        controlMode=p.POSITION_CONTROL,
+                                                        targetPosition=jointPoses[i],
+                                                        targetVelocity=0,
+                                                        force=500,
+                                                        physicsClientId=self._physics_client_id)
             else:
                 for i in range(self._num_dof):
                     p.resetJointState(self.robot_id, i, jointPoses[i], physicsClientId=self._physics_client_id)

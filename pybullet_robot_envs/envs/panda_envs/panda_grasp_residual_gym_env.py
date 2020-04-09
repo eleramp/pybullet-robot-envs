@@ -24,7 +24,7 @@ class PandaGraspResidualGymEnv(gym.Env):
 
     def __init__(self,
                  log_file=os.path.join(currentdir),
-                 action_repeat=40,
+                 action_repeat=50,
                  control_orientation=1,
                  control_eu_or_quat=0,
                  obj_name=None,
@@ -432,6 +432,8 @@ class PandaGraspResidualGymEnv(gym.Env):
                 action_f = [0.01, 0.01]
                 self._robot.apply_action_fingers(action_f)
                 p.stepSimulation(physicsClientId=self._physics_client_id)
+                if self._renders:
+                    time.sleep(0.02)
                 # n_step = 20
                 self._grasping_step -= 1
 
@@ -439,7 +441,7 @@ class PandaGraspResidualGymEnv(gym.Env):
             final_action_pos[2] += 0.2
 
             for _ in range(self._action_repeat*3):
-                self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
+                self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist(), max_vel=1)
                 p.stepSimulation(physicsClientId=self._physics_client_id)
                 if self._renders:
                     time.sleep(self._time_step)
