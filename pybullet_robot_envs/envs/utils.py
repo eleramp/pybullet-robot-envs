@@ -76,6 +76,37 @@ def sph_coord(x: float, y: float, z: float):
     phi = m.atan2(y,x)
     return [ro, theta, phi]
 
+def scale_gym_data(data_space, data):
+    """
+    Rescale the gym data from [low, high] to [-1, 1]
+    (no need for symmetric data space)
+
+    :param data_space: (gym.spaces.box.Box)
+    :param data: (np.ndarray)
+    :return: (np.ndarray)
+    """
+
+    assert data.shape == data_space.shape
+
+    low, high = data_space.low, data_space.high
+    return 2.0 * ((data - low) / (high - low)) - 1.0
+
+
+def unscale_gym_data(data_space, scaled_data):
+    """
+    Rescale the data from [-1, 1] to [low, high]
+    (no need for symmetric data space)
+
+    :param data_space: (gym.spaces.box.Box)
+    :param scaled_data: (np.ndarray)
+    :return: (np.ndarray)
+    """
+
+    assert scaled_data.shape == data_space.shape
+
+    low, high = data_space.low, data_space.high
+    return low + (0.5 * (scaled_data + 1.0) * (high - low))
+
 
 def plot_trajectories_from_file(file_1, file_2):
 
@@ -168,7 +199,7 @@ def plot_contact_normal_forces(filename):
     timestamp_idx = keys.index('timeStamp')
     n_force_idx = keys.index('normalForce')
 
-    data ={}
+    data = {}
     timestamp_max = 0
     force_max = 0
     for ln in log:
@@ -234,3 +265,45 @@ def plot_contact_normal_forces(filename):
     plt.text(-3.5, 150, 'Force (N)', ha='center', va='center', rotation='vertical')
 
     plt.show()
+
+def plot_observations_from_file(file):
+
+    f1 = open(file, 'rb')
+    lines_list_1 = f1.readlines()
+
+    x_vals, y_vals, z_vals = [], [], []
+    for ln in range(0, len(lines_list_1)):
+        tmp_list = []
+        values_l = lines_list_1[ln].split()
+        x_vals.extend([float(values_l[0])])
+        y_vals.extend([float(values_l[1])])
+        z_vals.extend([float(values_l[2])])
+
+    df_x = pd.DataFrame(x_vals,columns=['x'])
+    df_y = pd.DataFrame(y_vals, columns=['y'])
+    df_z = pd.DataFrame(z_vals, columns=['z'])
+
+    # Initialize the figure
+    plt.style.use('seaborn-darkgrid')
+
+    # create a color palette
+    palette = plt.get_cmap('Set3')
+
+    # Make the plot
+    plt.subplot(3, 1, 1)
+
+    plt.hist(df_x, bins=12, alpha=0.5)
+    plt.subplot(3, 1, 2)
+    plt.hist(df_y, bins=12, alpha=0.5)
+
+    plt.subplot(3, 1, 3)
+    plt.hist(df_z, bins=12, alpha=0.5)
+
+    # general title
+    plt.suptitle("normal force on contacts for each link in contact", fontsize=13, fontweight=0, color='black',
+                 style='italic', y=0.95)
+    plt.show()
+
+
+path = '/home/erampone/tmp_res/sq_dim.txt'
+plot_observations_from_file(path)
