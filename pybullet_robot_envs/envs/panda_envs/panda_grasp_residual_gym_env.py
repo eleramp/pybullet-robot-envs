@@ -11,7 +11,7 @@ import quaternion
 from pybullet_robot_envs.envs.panda_envs.panda_env import pandaEnv
 from pybullet_robot_envs.envs.world_envs.ycb_fetch_env import get_ycb_objects_list, YcbWorldFetchEnv
 from pybullet_robot_envs.envs.panda_envs.superq_grasp_planner import SuperqGraspPlanner
-from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication, axis_angle_to_quaternion, quaternion_to_axis_angle
+from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication, axis_angle_to_quaternion, quaternion_to_axis_angle, scale_gym_data
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
@@ -27,6 +27,7 @@ class PandaGraspResidualGymEnv(gym.Env):
                  action_repeat=50,
                  control_orientation=1,
                  control_eu_or_quat=0,
+                 normalize_obs = True,
                  obj_name=None,
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
@@ -40,6 +41,7 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         self._control_orientation = control_orientation
         self._control_eu_or_quat = control_eu_or_quat
+        self._normalize_obs = normalize_obs
         self._action_repeat = action_repeat
         self._n_control_pt = n_control_pt+1
         self._observation = []
@@ -63,13 +65,16 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._log_file = []
         self._log_file_path = []
         if DO_LOGGING:
-            self._log_file_path.append(os.path.join(log_file, 'nominal.txt'))
-            self._log_file_path.append(os.path.join(log_file, 'learned.txt'))
+            self._log_file_path.append(os.path.join(log_file, 'sq_dim.txt'))
+            self._log_file_path.append(os.path.join(log_file, 'vel_l.txt'))
+            self._log_file_path.append(os.path.join(log_file, 'vel_a.txt'))
             self._log_file.append(open(self._log_file_path[0], "w+"))
             self._log_file.append(open(self._log_file_path[1], "w+"))
+            self._log_file.append(open(self._log_file_path[2], "w+"))
 
             self._log_file[0].close()
             self._log_file[1].close()
+            self._log_file[2].close()
 
         # Initialize PyBullet simulator
         self._p = p
@@ -111,15 +116,13 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         self._superqs = []
         self._grasp_pose = []
+        self.are_gym_spaces_set = False
 
         # initialize simulation environment
         self._first_call = 1
         self.seed()
         self.reset()
         self._first_call = 0
-
-        # Define spaces
-        self.observation_space, self.action_space = self.create_spaces()
 
     def create_spaces(self):
         # Configure observation limits
@@ -143,11 +146,11 @@ class PandaGraspResidualGymEnv(gym.Env):
 
     def reset(self):
         if DO_LOGGING:
-            if self.logId is not None:
-                p.stopStateLogging(self.logId, physicsClientId=self._physics_client_id)
-            if self.logId_ct is not None:
-                p.stopStateLogging(self.logId_ct, physicsClientId=self._physics_client_id)
-            print("logging closed")
+            # if self.logId is not None:
+            #     p.stopStateLogging(self.logId, physicsClientId=self._physics_client_id)
+            # if self.logId_ct is not None:
+            #     p.stopStateLogging(self.logId_ct, physicsClientId=self._physics_client_id)
+            # print("logging closed")
 
             if not self._log_file[0].closed:
                 self._log_file[0].close()
@@ -156,6 +159,10 @@ class PandaGraspResidualGymEnv(gym.Env):
             if not self._log_file[1].closed:
                 self._log_file[1].close()
             self._log_file[1] = open(self._log_file_path[1], "a+")
+
+            if not self._log_file[2].closed:
+                self._log_file[2].close()
+            self._log_file[2] = open(self._log_file_path[2], "a+")
 
         p.resetSimulation(physicsClientId=self._physics_client_id)
         p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
@@ -183,7 +190,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._robot.pre_grasp()
 
         if self._obj_name is None:
-            obj_name = get_ycb_objects_list()[self.np_random.randint(0, 3)]
+            obj_name = get_ycb_objects_list()[self.np_random.randint(0, 4)]
             self._world._obj_name = obj_name
             print("obj_name {}".format(obj_name))
 
@@ -224,19 +231,29 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._grasping_step = 5
         self.last_approach_step = False
 
+        # Define spaces if not done already
+        if not self.are_gym_spaces_set:
+            self.observation_space, self.action_space = self.create_spaces()
+
         obs, _ = self.get_extended_observation()
+        scaled_obs = obs
+        if self._normalize_obs:
+            scaled_obs = scale_gym_data(self.observation_space, obs)
 
         if DO_LOGGING:
-            print("------------------------>>>>>start logging")
+            self.dump_obs(obs[39:42], obs[6:9], obs[9:12])
 
-            self.logId = p.startStateLogging(p.STATE_LOGGING_GENERIC_ROBOT, "log_successful_grasp.bin",
-                                             physicsClientId=self._physics_client_id)
-            self.logId_ct = p.startStateLogging(p.STATE_LOGGING_CONTACT_POINTS, "log_successful_grasp_ct.bin",
-                                                bodyUniqueIdA=self._robot.robot_id,
-                                                bodyUniqueIdB=self._world.obj_id,
-                                                physicsClientId=self._physics_client_id)
+        # if DO_LOGGING:
+        #     print("------------------------>>>>>start logging")
+        #
+        #     self.logId = p.startStateLogging(p.STATE_LOGGING_GENERIC_ROBOT, "log_successful_grasp.bin",
+        #                                      physicsClientId=self._physics_client_id)
+        #     self.logId_ct = p.startStateLogging(p.STATE_LOGGING_CONTACT_POINTS, "log_successful_grasp_ct.bin",
+        #                                         bodyUniqueIdA=self._robot.robot_id,
+        #                                         bodyUniqueIdB=self._world.obj_id,
+        #                                         physicsClientId=self._physics_client_id)
 
-        return obs
+        return scaled_obs
 
     def compute_grasp_pose(self):
 
@@ -295,9 +312,10 @@ class PandaGraspResidualGymEnv(gym.Env):
         observation_lim.extend(robot_obs_lim)
 
         self._observation.extend(list(self._grasp_pose.copy()))
-        observation_lim.extend([[-1, 1], [-1, 1], [-1, 1],
-                                [-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi],
-                                [-2 * m.pi, 2 * m.pi]])
+        if self._control_eu_or_quat is 0:
+            observation_lim.extend(robot_obs_lim[:6])
+        else:
+            observation_lim.extend(robot_obs_lim[:7])
 
         world_observation, world_obs_lim = self._world.get_observation()
         self._observation.extend(list(world_observation))
@@ -316,21 +334,21 @@ class PandaGraspResidualGymEnv(gym.Env):
 
             #
             self._observation.extend(list(sq_pos))
-            observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
+            observation_lim.extend(world_obs_lim[:3])
 
             #
             if self._control_eu_or_quat is 0:
                 self._observation.extend(list(sq_eu))
-                observation_lim.extend([[-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi]])
+                observation_lim.extend(world_obs_lim[3:6])
             else:
                 self._observation.extend(list(sq_quat))
-                observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+                observation_lim.extend(world_obs_lim[3:7])
 
             #
             self._observation.extend([sq_dim[0][0], sq_dim[1][0], sq_dim[2][0],
                                       sq_exp[0][0], sq_exp[1][0]])
             # check dim limits of sq dim params
-            observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [0, 2], [0, 2]])
+            observation_lim.extend([[0, 0.5], [0, 0.5], [0, 0.5], [0, 2], [0, 2]]) ## check
 
             # relative superq position wrt hand c.o.m. frame
             inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], r_quat)
@@ -338,16 +356,16 @@ class PandaGraspResidualGymEnv(gym.Env):
                                                                   sq_pos, sq_quat)
 
             self._observation.extend(list(sq_pos_in_hand))
-            observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
+            observation_lim.extend(robot_obs_lim[:3]) ## check
 
             if self._control_eu_or_quat is 0:
                 sq_euler_in_hand = p.getEulerFromQuaternion(sq_orn_in_hand)
                 self._observation.extend(list(sq_euler_in_hand))
-                observation_lim.extend([[-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi]])
+                observation_lim.extend(robot_obs_lim[3:6])
 
             else:
                 self._observation.extend(list(sq_orn_in_hand))
-                observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+                observation_lim.extend(robot_obs_lim[3:7])
 
         else:
             world_observation, world_obs_lim = self._world.get_observation()
@@ -366,16 +384,16 @@ class PandaGraspResidualGymEnv(gym.Env):
                                                                     world_observation[:3], w_quat)
 
             self._observation.extend(list(obj_pos_in_hand))
-            observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
+            observation_lim.extend(robot_obs_lim[:3])
 
             if self._control_eu_or_quat is 0:
                 obj_euler_in_hand = p.getEulerFromQuaternion(obj_orn_in_hand)
                 self._observation.extend(list(obj_euler_in_hand))
-                observation_lim.extend([[-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi]])
+                observation_lim.extend(robot_obs_lim[3:6])
 
             else:
                 self._observation.extend(list(obj_orn_in_hand))
-                observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
+                observation_lim.extend(robot_obs_lim[3:7])
 
         return np.array(self._observation), observation_lim
 
@@ -453,8 +471,8 @@ class PandaGraspResidualGymEnv(gym.Env):
             self._env_step_counter = self._max_steps+1
 
         # dump data
-        if DO_LOGGING:
-            self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat.tolist()]])
+        # if DO_LOGGING:
+        #    self.dump_data([base_action, [final_action_pos.tolist() + final_action_quat.tolist()]])
 
         return final_action_pos.tolist() + final_action_quat.tolist()
 
@@ -471,10 +489,17 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         obs, _ = self.get_extended_observation()
 
+        if DO_LOGGING:
+            self.dump_obs(obs[39:42], r_obs[6:9], r_obs[9:12])
+
+        scaled_obs = obs
+        if self._normalize_obs:
+            scaled_obs = scale_gym_data(self.observation_space, obs)
+
         # print("reward")
         # print(reward)
 
-        return obs, np.array(reward), np.array(done), {}
+        return scaled_obs, np.array(reward), np.array(done), {}
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -623,3 +648,21 @@ class PandaGraspResidualGymEnv(gym.Env):
                 self._log_file[1].write(str(j))
                 self._log_file[1].write(" ")
             self._log_file[1].write("\n")
+
+    def dump_obs(self, sq_dim, vel_l, vel_a):
+        assert 3 == len(self._log_file)
+
+        for i in sq_dim:
+            self._log_file[0].write(str(i))
+            self._log_file[0].write(" ")
+        self._log_file[0].write("\n")
+
+        for j in vel_l:
+            self._log_file[1].write(str(j))
+            self._log_file[1].write(" ")
+        self._log_file[1].write("\n")
+
+        for k in vel_a:
+            self._log_file[2].write(str(k))
+            self._log_file[2].write(" ")
+        self._log_file[2].write("\n")
