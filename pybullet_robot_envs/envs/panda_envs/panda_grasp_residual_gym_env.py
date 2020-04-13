@@ -11,7 +11,7 @@ import quaternion
 from pybullet_robot_envs.envs.panda_envs.panda_env import pandaEnv
 from pybullet_robot_envs.envs.icub_envs.icub_env import iCubEnv
 from pybullet_robot_envs.envs.world_envs.ycb_fetch_env import get_ycb_objects_list, YcbWorldFetchEnv
-from pybullet_robot_envs.envs.icub_envs.superq_grasp_planner import SuperqGraspPlanner
+from pybullet_robot_envs.envs.panda_envs.superq_grasp_planner import SuperqGraspPlanner
 from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication, axis_angle_to_quaternion, quaternion_to_axis_angle
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -129,8 +129,8 @@ class PandaGraspResidualGymEnv(gym.Env):
         observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
 
         # Configure action space
-        action_high = np.array([0.05, 0.05, 0.05, 1.57, 1.57, 1.57, 0.01])
-        action_low = np.array([-0.05, -0.05, -0.05, -1.57, -1.57, -1.57, -0.01])
+        action_high = np.array([0.08, 0.08, 0.08, 1.57, 1.57, 1.57, 0.01])
+        action_low = np.array([-0.08, -0.08, -0.08, -1.57, -1.57, -1.57, -0.01])
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
@@ -189,8 +189,6 @@ class PandaGraspResidualGymEnv(gym.Env):
                                     starting_pose=self._robot._home_hand_pose, n_control_pt=self._n_control_pt)
 
         self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
-
-        self.compute_grasp_pose()
 
         self._base_controller.compute_approach_path()
 
@@ -253,6 +251,11 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         if self._renders:
             self._base_controller._visualizer.visualize()
+
+        ok = self._base_controller.compute_approach_path()
+        if not ok:
+            print("can't compute a valid trajectory")
+            return self.reset()
 
     def get_extended_observation(self):
         self._observation = []
@@ -508,7 +511,7 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         # cost 1: object touched
         if self._world.check_contact(self._robot.robot_id) and not self.last_approach_step:
-            c1 = np.float32(2.0)
+            c1 = np.float32(5.0)
 
         # cost 2: object falls
         if self._control_eu_or_quat is 1:

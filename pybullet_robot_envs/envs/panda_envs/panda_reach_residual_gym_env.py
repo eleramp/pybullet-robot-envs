@@ -11,7 +11,7 @@ import quaternion
 from pybullet_robot_envs.envs.panda_envs.panda_env import pandaEnv
 from pybullet_robot_envs.envs.icub_envs.icub_env import iCubEnv
 from pybullet_robot_envs.envs.world_envs.ycb_fetch_env import get_ycb_objects_list, YcbWorldFetchEnv
-from pybullet_robot_envs.envs.icub_envs.superq_grasp_planner import SuperqGraspPlanner
+from pybullet_robot_envs.envs.panda_envs.superq_grasp_planner import SuperqGraspPlanner
 from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication, axis_angle_to_quaternion, quaternion_to_axis_angle
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -25,7 +25,7 @@ class PandaReachResidualGymEnv(gym.Env):
 
     def __init__(self,
                  log_file=os.path.join(currentdir),
-                 action_repeat=20,
+                 action_repeat=40,
                  control_orientation=1,
                  control_eu_or_quat=0,
                  obj_name=None,
@@ -129,8 +129,8 @@ class PandaReachResidualGymEnv(gym.Env):
         observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
 
         # Configure action space
-        action_high = np.array([0.05, 0.05, 0.05, 1.57, 1.57, 1.57])
-        action_low = np.array([-0.05, -0.05, -0.05, -1.57, -1.57, -1.57])
+        action_high = np.array([0.08, 0.08, 0.08, 1.57, 1.57, 1.57])
+        action_low = np.array([-0.08, -0.08, -0.08, -1.57, -1.57, -1.57])
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
@@ -184,15 +184,18 @@ class PandaReachResidualGymEnv(gym.Env):
         self._world.debug_gui()
         robot_obs, _ = self._robot.get_observation()
 
-        # if self._first_call:
-        self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
-                                    starting_pose=self._robot._home_hand_pose, n_control_pt=self._n_control_pt)
+        if self._first_call:
+            self._base_controller.reset(robot_id=self._robot.robot_id, obj_id=self._world.obj_id,
+                                        starting_pose=self._robot._home_hand_pose, n_control_pt=self._n_control_pt)
 
-        self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
+            self._base_controller.set_robot_base_pose(p.getBasePositionAndOrientation(self._robot.robot_id))
 
-        self.compute_grasp_pose()
+            self.compute_grasp_pose()
 
-        self._base_controller.compute_approach_path()
+        ok = self._base_controller.compute_approach_path()
+        if not ok:
+            print("can't compute a valid trajectory")
+            return self.reset()
 
         self.debug_gui()
         p.stepSimulation()
@@ -257,7 +260,9 @@ class PandaReachResidualGymEnv(gym.Env):
         print("grasp pose: {}".format(self._grasp_pose))
 
         if self._renders:
-            self._base_controller._visualizer.visualize()
+            self._base_controller._visualizer.render()
+
+
 
     def get_extended_observation(self):
         self._observation = []
@@ -415,6 +420,7 @@ class PandaReachResidualGymEnv(gym.Env):
     def step(self, action):
 
         # apply action on the robot
+
         applied_action = self.apply_action(action)
 
         obs, _ = self.get_extended_observation()

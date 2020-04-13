@@ -1,10 +1,19 @@
+#!/usr/bin/env python3
+
 import os, inspect
 import numpy as np
 import pybullet as p
 import math as m
+import time
 import trimesh
 import superquadric_bindings
 from gym.utils import seeding
+
+import rospy
+# import tf_conversions
+import std_msgs.msg
+from geometry_msgs.msg import PoseArray
+from geometry_msgs.msg import Pose
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
@@ -34,12 +43,11 @@ class SuperqGraspPlanner:
         self._grasping_hand = grasping_hand
         self._noise_pcl = noise_pcl
         self._robot_base_pose = robot_base_pose
-        # offset between icub hand's ref.frame in PyBullet and on the real robot --> TODO: make it less hard coded
         self._real_icub_R_sim_robot = get_real_icub_to_sim_robot()[robot_name]
         self._starting_pose = []
         self._best_grasp_pose = []
         self._approach_path = []
-        self._n_control_pt = 1
+        self._n_control_pt = 4
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
 
@@ -56,6 +64,43 @@ class SuperqGraspPlanner:
         if self._render:
             self._visualizer = Visualizer()
         self._gp_reached = 0
+
+        # ------ Set ROS node ------ #
+        rospy.init_node('pybullet_sq_grasp_planner', anonymous=True)
+        self._pub = rospy.Publisher('pybullet_poses', PoseArray, queue_size=1)
+        self._sub = rospy.Subscriber('move_group_plan_waypoints', PoseArray, callback=self.trajectory_callback, queue_size=1)
+
+        rate = rospy.Rate(10)  # 10hz
+
+        self._new_trajectory_msg = False
+        self._trajectory_points = []
+
+        # ------ Set Visualizer parameters ------ #
+        if self._render:
+            self._visualizer.setPosition(cfg.visualizer['x'], cfg.visualizer['y'])
+            self._visualizer.setSize(cfg.visualizer['width'], cfg.visualizer['height'])
+
+            self._visualizer.resetPoints()
+            self._visualizer.resetSuperq()
+            self._visualizer.resetPoses()
+
+        # ------ Set Superquadric Model parameters ------ #
+        self._sq_estimator.SetNumericValue("tol", cfg.sq_model['tol'])
+        self._sq_estimator.SetIntegerValue("print_level", 0)
+        self._sq_estimator.SetIntegerValue("optimizer_points", cfg.sq_model['optimizer_points'])
+        self._sq_estimator.SetBoolValue("random_sampling", cfg.sq_model['random_sampling'])
+
+        # ------ Set Superquadric Grasp parameters ------ #
+        self._grasp_estimator.SetIntegerValue("print_level", 0)
+        self._grasp_estimator.SetNumericValue("tol", cfg.sq_grasp[self._robot_name]['tol'])
+        self._grasp_estimator.SetIntegerValue("max_superq", cfg.sq_grasp[self._robot_name]['max_superq'])
+        self._grasp_estimator.SetNumericValue("constr_tol", cfg.sq_grasp[self._robot_name]['constr_tol'])
+        self._grasp_estimator.SetStringValue("left_or_right", "right" if self._grasping_hand is 'r' else "left")
+        self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp[self._robot_name]['plane_table']))
+        self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp[self._robot_name]['displacement']))
+        self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp[self._robot_name]['hand_sq']))
+        self._grasp_estimator.setMatrix("bounds_right", np.array(cfg.sq_grasp[self._robot_name]['bounds_right']))
+        self._grasp_estimator.setMatrix("bounds_left", np.array(cfg.sq_grasp[self._robot_name]['bounds_left']))
 
         # initialize
         self.seed()
@@ -75,38 +120,17 @@ class SuperqGraspPlanner:
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
 
-        if self._render:
-            self._visualizer.setPosition(cfg.visualizer['x'], cfg.visualizer['y'])
-            self._visualizer.setSize(cfg.visualizer['width'], cfg.visualizer['height'])
-
-            self._visualizer.resetPoints()
-            self._visualizer.resetSuperq()
-            self._visualizer.resetPoses()
-
-        # ------ Set Superquadric Model parameters ------ #
-        self._sq_estimator.SetNumericValue("tol", cfg.sq_model['tol'])
-        self._sq_estimator.SetIntegerValue("print_level", 0)
+        # Update object class
         if self._object_name is not None and self._object_name in cfg.objects.keys():
             self._sq_estimator.SetStringValue("object_class", cfg.objects[self._object_name])
         else:
             self._sq_estimator.SetStringValue("object_class", cfg.sq_model['object_class'])
-        self._sq_estimator.SetIntegerValue("optimizer_points", cfg.sq_model['optimizer_points'])
-        self._sq_estimator.SetBoolValue("random_sampling", cfg.sq_model['random_sampling'])
-
-        # ------ Set Superquadric Grasp parameters ------ #
-        self._grasp_estimator.SetIntegerValue("print_level", 0)
-        self._grasp_estimator.SetNumericValue("tol", cfg.sq_grasp[self._robot_name]['tol'])
-        self._grasp_estimator.SetIntegerValue("max_superq", cfg.sq_grasp[self._robot_name]['max_superq'])
-        self._grasp_estimator.SetNumericValue("constr_tol", cfg.sq_grasp[self._robot_name]['constr_tol'])
-        self._grasp_estimator.SetStringValue("left_or_right", "right" if self._grasping_hand is 'r' else "left")
-        self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp[self._robot_name]['plane_table']))
-        self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp[self._robot_name]['displacement']))
-        self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp[self._robot_name]['hand_sq']))
 
         return
 
     def set_robot_base_pose(self, pose):
-        self._robot_base_pose = pose
+        self._robot_base_pose = [list(pose[0]), list(pose[1])]
+        self._robot_base_pose[0][2] -= 0.05  # take into account the displacement between COM and URDF link pose
 
     def set_object_info(self, obj_info):
         self._obj_info = obj_info
@@ -168,7 +192,7 @@ class SuperqGraspPlanner:
             v2 = w_robot_R_obj.dot(v1)
             sph_vec = sph_coord(v2[0], v2[1], v2[2])
             # sample only points visible to the robot eyes, to simulate partial observability of the object
-            if sph_vec[1] <= m.pi/8 or -m.pi/2 < sph_vec[2] < m.pi/2 or v1[0] < 0:
+            if 1: #  sph_vec[1] <= m.pi/8 or -m.pi/2 < sph_vec[2] < m.pi/2 or v1[0] < 0:
                 v3 = v2 + w_robot_T_obj[0]
                 v3[0] += noise[i]
 
@@ -316,46 +340,99 @@ class SuperqGraspPlanner:
     def get_grasp_pose(self):
         return self._best_grasp_pose.copy()
 
-    def compute_approach_path(self):
-        # compute approach trajectory from initial hand pose to candidate grasp pose.
+    def trajectory_callback(self, ros_poses):
+        rospy.loginfo("Received poses: {}".format(len(ros_poses.poses)))
 
-        # reset current path
         self._approach_path = []
+        link_states = p.getLinkStates(self._robot_id, [8, 11])
+        ph_T_w = p.invertTransform(link_states[0][4], link_states[0][5])
+        ph_T_pgt = p.multiplyTransforms(ph_T_w[0], ph_T_w[1], link_states[1][4], link_states[1][5])
 
-        # Relative transform of the grasp pose wrt hand starting pose
-        sp_inv_pose = p.invertTransform(self._starting_pose[:3], p.getQuaternionFromEuler(self._starting_pose[3:6]))
+        for ros_pose in ros_poses.poses:
+            r_pose_ph = ((ros_pose.position.x, ros_pose.position.y, ros_pose.position.z),
+                        (ros_pose.orientation.x, ros_pose.orientation.y, ros_pose.orientation.z, ros_pose.orientation.w))
 
-        sp_P_gp = p.multiplyTransforms(sp_inv_pose[0], sp_inv_pose[1],
-                                       self._best_grasp_pose[:3], p.getQuaternionFromEuler(self._best_grasp_pose[3:6]))
+            # ---> Transform from panda_hand to panda_grasptarget
+            r_pose_pgt = p.multiplyTransforms(r_pose_ph[0], r_pose_ph[1], ph_T_pgt[0], ph_T_pgt[1])
 
-        # ---> Compute way-points along the linear trajectory from initial to grasping pose <--- #
-
-        # linear path from initial to grasping pose
-        dist_object = np.linalg.norm(sp_P_gp[0])
-        # fixed distance among way-points
-        dist_intra_path_points = 8 / self._n_control_pt * 0.01
-        n_pt = int(dist_object / dist_intra_path_points)
-
-        i_path = [1 if n_pt == 0 else i / n_pt for i in range(0, n_pt + 1)]
-
-        for idx in i_path[-(self._n_control_pt+1):]:
-
-            # --- Position --- #
-            delta_pos = idx * np.array(sp_P_gp[0])
-
-            # --- Orientation --- #
-            delta_ax = quaternion_to_axis_angle(sp_P_gp[1])
-            delta_ax[-1] = idx * delta_ax[-1]
-            delta_quat = axis_angle_to_quaternion(delta_ax)
-
-            next_pose = p.multiplyTransforms(self._starting_pose[:3], p.getQuaternionFromEuler(self._starting_pose[3:6]),
-                                             delta_pos, delta_quat)
-
-            self._approach_path.append(next_pose)
-
-        self._debug_gui(self._approach_path)
+            # ... and from robot base to pybullet world
+            py_pose_pgt = p.multiplyTransforms(self._robot_base_pose[0], self._robot_base_pose[1], r_pose_pgt[0], r_pose_pgt[1])
+            self._approach_path.append(py_pose_pgt)
 
         self._approach_path.reverse()
+
+        self._new_trajectory_msg = True
+        return
+
+    def compute_approach_path(self):
+        # Send starting pose and grasping pose to moveit to compute the trajectory
+
+        # ---> Express poses  wrt robot base frame
+        r_T_py = p.invertTransform(self._robot_base_pose[0], self._robot_base_pose[1])
+
+        # starting pose
+        r_T_sp = p.multiplyTransforms(r_T_py[0], r_T_py[1],
+                                      self._starting_pose[:3], p.getQuaternionFromEuler(self._starting_pose[3:6]))
+        # grasping pose
+        r_T_gp = p.multiplyTransforms(r_T_py[0], r_T_py[1],
+                                       self._best_grasp_pose[:3], p.getQuaternionFromEuler(self._best_grasp_pose[3:6]))
+
+        # ---> Transform from panda_grasptarget to panda_hand
+        link_states = p.getLinkStates(self._robot_id, [8,11])
+        pgt_T_w = p.invertTransform(link_states[1][4], link_states[1][5])
+        pgt_T_ph = p.multiplyTransforms(pgt_T_w[0], pgt_T_w[1], link_states[0][4], link_states[0][5])
+
+        # starting pose
+        r_T_sp_ph = p.multiplyTransforms(r_T_sp[0], r_T_sp[1], pgt_T_ph[0], pgt_T_ph[1])
+
+        # grasping pose
+        r_T_gp_ph = p.multiplyTransforms(r_T_gp[0], r_T_gp[1], pgt_T_ph[0], pgt_T_ph[1])
+
+        # ---> Create ROS PoseArray messages
+        posearray = PoseArray()
+        posearray.header.stamp = rospy.Time.now()  # timestamp of creation of the message
+        posearray.header.frame_id = "panda_link0"  # frame id in which the array is published
+
+        # start pose
+        pose_msg_start = Pose()
+
+        pose_msg_start.position.x = r_T_sp_ph[0][0]
+        pose_msg_start.position.y = r_T_sp_ph[0][1]
+        pose_msg_start.position.z = r_T_sp_ph[0][2]
+        pose_msg_start.orientation.x = r_T_sp_ph[1][0]
+        pose_msg_start.orientation.y = r_T_sp_ph[1][1]
+        pose_msg_start.orientation.z = r_T_sp_ph[1][2]
+        pose_msg_start.orientation.w = r_T_sp_ph[1][3]
+
+        posearray.poses.append(pose_msg_start)
+        pose_msg_goal = Pose()
+
+        # goal pose
+        pose_msg_goal.position.x = r_T_gp_ph[0][0]
+        pose_msg_goal.position.y = r_T_gp_ph[0][1]
+        pose_msg_goal.position.z = r_T_gp_ph[0][2]
+        pose_msg_goal.orientation.x = r_T_gp_ph[1][0]
+        pose_msg_goal.orientation.y = r_T_gp_ph[1][1]
+        pose_msg_goal.orientation.z = r_T_gp_ph[1][2]
+        pose_msg_goal.orientation.w = r_T_gp_ph[1][3]
+
+        posearray.poses.append(pose_msg_goal)
+
+        # ---> Send msg to ros topic
+        self._new_trajectory_msg = False
+        rospy.loginfo(posearray)
+        self._pub.publish(posearray)
+
+        # wait for response from moveit
+        count = 10
+        while not self._new_trajectory_msg and count is not 0:
+            count -= 1
+            time.sleep(1)
+
+        if count is 0 or self.is_approach_path_empty():
+            return False
+
+        self._debug_gui(self._approach_path)
         return True
 
     def is_last_approach_step(self):

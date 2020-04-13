@@ -7,7 +7,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 os.sys.path.insert(0, currentdir)
 
 import pybullet as p
-import pybullet_data
+from icub_model_pybullet import franka_panda
 from gym.utils import seeding
 
 import numpy as np
@@ -29,7 +29,7 @@ class pandaEnv:
         self._include_vel_obs = includeVelObs
         self._control_eu_or_quat = control_eu_or_quat
 
-        self._workspace_lim = [[0.3, 0.7], [-0.3, 0.3], [0.65, 1.5]]
+        self._workspace_lim = [[0.2, 0.7], [-0.3, 0.3], [0.65, 1.5]]
         self._eu_lim = [[-m.pi, m.pi], [-m.pi, m.pi], [-m.pi, m.pi]]
 
         self.endEffLink = 11  # 8
@@ -47,7 +47,7 @@ class pandaEnv:
     def reset(self):
         # load robot
         flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_INERTIA_FROM_FILE
-        self.robot_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "franka_panda/panda.urdf"),
+        self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda.urdf"),
                                   basePosition=self._base_position, useFixedBase=True, flags=flags)
 
         # reset joints to home position
@@ -65,17 +65,17 @@ class pandaEnv:
         self.ll, self.ul, self.jr, self.rs = self.get_joint_ranges()
 
         if self._use_IK:
-            self._home_hand_pose = [self._base_position[0] + 0.2,
-                                    self._base_position[1] - 0.2,
-                                    self._base_position[2] + 0.4,
-                                    -2/3*m.pi, -m.pi/4, 0]  # x,y,z,roll,pitch,yaw
+            self._home_hand_pose = [self._base_position[0] + 0.3,
+                                    self._base_position[1],
+                                    self._base_position[2] + 0.52,
+                                    m.pi, 0, 0]  # x,y,z,roll,pitch,yaw
 
-            self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._base_position[0] + 0.2)),
-                                    min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], self._base_position[1] - 0.2)),
-                                    min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._base_position[2] + 0.4)),
-                                    min(m.pi, max(-m.pi, -2/3*m.pi)),
-                                    min(m.pi, max(-m.pi, -m.pi/4)),
-                                    min(m.pi, max(-m.pi, 0))]
+            self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._home_hand_pose[0])),
+                                    min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], self._home_hand_pose[1])),
+                                    min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._home_hand_pose[2])),
+                                    min(m.pi, max(-m.pi, self._home_hand_pose[3])),
+                                    min(m.pi, max(-m.pi, self._home_hand_pose[4])),
+                                    min(m.pi, max(-m.pi, self._home_hand_pose[5]))]
 
             self.apply_action(self._home_hand_pose)
             p.stepSimulation()

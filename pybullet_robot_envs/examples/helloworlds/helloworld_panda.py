@@ -11,6 +11,7 @@ os.sys.path.insert(0, parentdir)
 
 import pybullet as p
 import pybullet_data
+from icub_model_pybullet import franka_panda
 import time
 import os
 import math as m
@@ -59,11 +60,11 @@ def main():
 
 	flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_INERTIA_FROM_FILE
 
-	pandaId = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "franka_panda/panda.urdf"),
+	pandaId = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda.urdf"),
 						basePosition=[0.6, 0, 0.625], useFixedBase=True, flags=flags)
 
 	init_pos = [0, -0.54, 0, -2.6, -0.30, 2, 1, 0.04, 0.04]
-	endEffLink = 8
+	endEffLink =11
 
 	# Load other objects
 	p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"), [1, 0.0, 0.0])
@@ -115,14 +116,14 @@ def main():
 		time.sleep(0.03)
 
 	# go down to the object
-	pos_2 = [1, 0.0, 0.65+0.0584]
+	pos_2 = [1, 0.0, 0.63]
 	quat_2 = p.getQuaternionFromEuler([m.pi, 0, 0])
 	jointPoses = p.calculateInverseKinematics(pandaId, endEffLink, pos_2, quat_2)
 	p.setJointMotorControlArray(pandaId, jointIds, p.POSITION_CONTROL, targetPositions=jointPoses,
 								forces=[50]*len(jointIds))
 	for _ in range(70):
 		p.stepSimulation()
-		time.sleep(0.03)
+		time.sleep(0.004)
 
 	# close fingers
 	p.setJointMotorControlArray(pandaId, jointIds[-2:], p.POSITION_CONTROL, targetPositions=[0.012, 0.012],

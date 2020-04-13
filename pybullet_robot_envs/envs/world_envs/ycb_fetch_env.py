@@ -16,6 +16,7 @@ def get_ycb_objects_list():
         'YcbMustardBottle',
         'YcbTomatoSoupCan',
         'YcbCrackerBox',
+        'YcbChipsCan',
         'YcbBanana',
         'YcbFoamBrick',
         'YcbGelatinBox',
@@ -28,7 +29,6 @@ def get_ycb_objects_list():
         'YcbScissors',
         'YcbStrawberry',
         'YcbTennisBall',
-        'YcbChipsCan',
     ]
 
     return obj_list

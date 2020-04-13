@@ -18,7 +18,7 @@ import math as m
 
 def main():
 
-    env = PandaReachResidualGymEnv(obj_pose_rnd_std=0.05, renders=True, obj_name=1)
+    env = PandaReachResidualGymEnv(obj_pose_rnd_std=0.05, renders=True, obj_name=0)
     motorsIds = []
 
     dv = 1
@@ -28,28 +28,29 @@ def main():
     motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dv, dv, 0.0))
     motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dv, dv, 0.0))
     motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", 0, 0.04, 0.04))
-    motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", 0, 0.04, 0.04))
+    # motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", 0, 0.04, 0.04))
+    # motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", 0, 0.04, 0.04))
 
 
     done = False
-
-    for t in range(10000000):
+    n_episodes = 1
+    while n_episodes <= 100:
         #env.render()
         action = []
         for motorId in motorsIds:
             action.append(env._p.readUserDebugParameter(motorId))
 
-        action = int(action[0])
+        # action = int(action[0])
 
         #print(env.step(action))
 
         state, reward, done, _ = env.step(action)
-        if t%10==0:
-            print("reward ", reward)
-            print("done ", done)
+        #if t%10==0:
+        #    print("reward ", reward)
+        #    print("done ", done)
         if done:
             env.reset()
+            n_episodes += 1
 
 if __name__ == '__main__':
     main()
