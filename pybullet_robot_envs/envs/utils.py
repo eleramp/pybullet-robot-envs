@@ -286,24 +286,26 @@ def plot_observations_from_file(file):
     # Initialize the figure
     plt.style.use('seaborn-darkgrid')
 
-    # create a color palette
-    palette = plt.get_cmap('Set3')
-
     # Make the plot
-    plt.subplot(3, 1, 1)
+    df_x.plot.hist(bins=100, alpha=0.5)
+    x_min, x_max = min(x_vals), max(x_vals)
+    x_mean, x_std = np.mean(x_vals), np.std(x_vals)
+    title = "min: " + str(round(float(x_min), 2)) + ", max: " + str(round(float(x_max), 2)) + ", mean: " + str(round(float(x_mean), 2)) + ", std: " + str(round(float(x_std), 2))
+    plt.title(title, fontsize=12, fontweight=0, color='black')
 
-    plt.hist(df_x, bins=12, alpha=0.5)
-    plt.subplot(3, 1, 2)
-    plt.hist(df_y, bins=12, alpha=0.5)
+    df_y.plot.hist(bins=100, alpha=0.5)
+    y_min, y_max = min(y_vals), max(y_vals)
+    y_mean, y_std = np.mean(y_vals), np.std(y_vals)
+    title = "min: " + str(round(float(y_min), 2)) + ", max: " + str(round(float(y_max), 2)) + ", mean: " + str(round(float(y_mean), 2)) + ", std: " + str(round(float(y_std), 2))
+    plt.title(title, fontsize=12, fontweight=0, color='black')
 
-    plt.subplot(3, 1, 3)
-    plt.hist(df_z, bins=12, alpha=0.5)
-
-    # general title
-    plt.suptitle("normal force on contacts for each link in contact", fontsize=13, fontweight=0, color='black',
-                 style='italic', y=0.95)
+    df_z.plot.hist(bins=100, alpha=0.5)
+    z_min, z_max = min(z_vals), max(z_vals)
+    z_mean, z_std = np.mean(z_vals), np.std(z_vals)
+    title = "min: " + str(round(float(z_min), 2)) + ", max: " + str(round(float(z_max), 2)) + ", mean: " + str(round(float(z_mean), 2)) + ", std: " + str(round(float(z_std), 2))
+    plt.title(title, fontsize=12, fontweight=0, color='black')
     plt.show()
 
 
-path = '/home/erampone/tmp_res/sq_dim.txt'
-plot_observations_from_file(path)
+# path = '/home/erampone/tmp_res/vel_l.txt'
+# plot_observations_from_file(path)
