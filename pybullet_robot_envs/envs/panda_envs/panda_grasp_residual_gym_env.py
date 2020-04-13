@@ -89,9 +89,9 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._traj_client_id = p.connect(p.DIRECT)
 
         # Load robot
-        self._robot = pandaEnv(self._physics_client_id, use_IK=1)
+        self._robot = pandaEnv(self._physics_client_id, use_IK=1, control_eu_or_quat=self._control_eu_or_quat)
 
-        self._robot_traj = pandaEnv(self._traj_client_id, use_IK=1)
+        self._robot_traj = pandaEnv(self._traj_client_id, use_IK=1, control_eu_or_quat=self._control_eu_or_quat)
 
         # Load world environment
         if self._obj_name is None:
@@ -138,8 +138,18 @@ class PandaGraspResidualGymEnv(gym.Env):
         observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
 
         # Configure action space
-        action_high = np.array([0.08, 0.08, 0.08, 0.2, 0.2, 0.7])
-        action_low = np.array([-0.08, -0.08, -0.08, -0.2, -0.2, -0.7])
+        action_dim = self._robot.get_action_dimension()
+        if action_dim == 6: # position and orientation (euler angles)
+            action_high = np.array([0.08, 0.08, 0.08, 0.2, 0.2, 0.7])
+            action_low = np.array([-0.08, -0.08, -0.08, -0.2, -0.2, -0.7])
+
+        elif action_dim == 7: # position and orientation (quaternion)
+            action_high = np.array([0.08, 0.08, 0.08, 1, 1, 1, 1])
+            action_low = np.array([-0.08, -0.08, -0.08, -1, -1, -1, -1])
+        else:
+            action_high = np.array([0.08, 0.08, 0.08])
+            action_low = np.array([-0.08, -0.08, -0.08])
+
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
         return observation_space, action_space
@@ -311,12 +321,18 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._observation.extend(list(robot_observation))
         observation_lim.extend(robot_obs_lim)
 
-        self._observation.extend(list(self._grasp_pose.copy()))
+        # grasp pose
+        gp = self._grasp_pose.copy()
+        self._observation.extend(list(gp[:3]))
+        observation_lim.extend(robot_obs_lim[:3])
         if self._control_eu_or_quat is 0:
-            observation_lim.extend(robot_obs_lim[:6])
+            self._observation.extend(list(gp[3:6]))
+            observation_lim.extend(robot_obs_lim[3:6])
         else:
-            observation_lim.extend(robot_obs_lim[:7])
+            self._observation.extend(list(p.getQuaternionFromEuler(gp[3:6])))
+            observation_lim.extend(robot_obs_lim[3:7])
 
+        # object pose
         world_observation, world_obs_lim = self._world.get_observation()
         self._observation.extend(list(world_observation))
         observation_lim.extend(world_obs_lim)

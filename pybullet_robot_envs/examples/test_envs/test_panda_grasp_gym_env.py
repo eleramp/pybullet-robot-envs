@@ -18,39 +18,34 @@ import math as m
 
 def main():
 
-    env = PandaGraspResidualGymEnv(obj_pose_rnd_std=0.0, renders=True, obj_name=2, n_control_pt=2)
+    env = PandaGraspResidualGymEnv(obj_pose_rnd_std=0.07, renders=True, obj_name=1, n_control_pt=2, control_eu_or_quat=1)
     motorsIds = []
 
     dv = 0.05
     dvo = 1.57
-    motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhPosZ", -dv, dv, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dvo, dvo, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dvo, dvo, 0.0))
-    motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dvo, dvo, 0.0))
+    # motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
+    # motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
+    # motorsIds.append(env._p.addUserDebugParameter("lhPosZ", -dv, dv, 0.0))
+    # motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dvo, dvo, 0.0))
+    # motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dvo, dvo, 0.0))
+    # motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dvo, dvo, 0.0))
     # motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", -0.01, 0.01, 0.04))
     # motorsIds.append(env._p.addUserDebugParameter("lhFingerLeft", 0, 0.04, 0.04))
 
 
     done = False
+    n_episode = 0
+    while n_episode < 100:
+        # env.render()
+        # action = []
+        # for motorId in motorsIds:
+        #     action.append(env._p.readUserDebugParameter(motorId))
 
-    for t in range(10000000):
-        #env.render()
-        action = []
-        for motorId in motorsIds:
-            action.append(env._p.readUserDebugParameter(motorId))
-
-        # action = int(action[0])
-
-        #print(env.step(action))
-
+        action = env.action_space.sample()
         state, reward, done, _ = env.step(action)
-        if t%1==0:
-            print("reward ", reward)
-            print("done ", done)
         if done:
             env.reset()
+            n_episode += 1
 
 if __name__ == '__main__':
     main()

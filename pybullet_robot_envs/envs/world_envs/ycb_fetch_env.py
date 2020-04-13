@@ -71,6 +71,9 @@ class YcbWorldFetchEnv(WorldFetchEnv):
         table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
         self._h_table = table_info[5][2] + table_info[3][2]/2
 
+        # set ws limit on z according to table height
+        self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
+
         # Load object. Randomize its start position if requested
         self._obj_init_pose = self._sample_pose()
         self.obj_id = p.loadURDF(os.path.join(ycb_objects_models_sim.objects.getDataPath(), self._obj_name,  "model.urdf"),
