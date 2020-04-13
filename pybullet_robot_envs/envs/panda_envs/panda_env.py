@@ -116,6 +116,12 @@ class pandaEnv:
     def get_observation_dimension(self):
         return len(self.get_observation())
 
+    def get_workspace(self):
+        return [i[:] for i in self._workspace_lim]
+
+    def set_workspace(self, ws):
+        self._workspace_lim = [i[:] for i in ws]
+
     def get_observation(self):
         observation = []
         observation_lim = []

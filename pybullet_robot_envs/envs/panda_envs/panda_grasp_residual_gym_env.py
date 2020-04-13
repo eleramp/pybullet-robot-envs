@@ -24,7 +24,7 @@ class PandaGraspResidualGymEnv(gym.Env):
 
     def __init__(self,
                  log_file=os.path.join(currentdir),
-                 action_repeat=50,
+                 action_repeat=60,
                  control_orientation=1,
                  control_eu_or_quat=0,
                  normalize_obs = True,
@@ -98,9 +98,10 @@ class PandaGraspResidualGymEnv(gym.Env):
             obj_name = get_ycb_objects_list()[0]
         else:
             obj_name = self._obj_name
+
         self._world = YcbWorldFetchEnv(self._physics_client_id,
                                        obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
-                                       workspace_lim=self._robot._workspace_lim,
+                                       workspace_lim=self._robot.get_workspace(),
                                        control_eu_or_quat=self._control_eu_or_quat)
 
         # Load base controller
@@ -112,7 +113,9 @@ class PandaGraspResidualGymEnv(gym.Env):
                                                    noise_pcl=self._noise_pcl)
 
         # limit iCub workspace to table plane
-        self._robot._workspace_lim[2][0] = self._world.get_table_height()
+        workspace = self._robot.get_workspace()
+        workspace[2][0] = self._world.get_table_height()
+        self._robot.set_workspace(workspace)
 
         self._superqs = []
         self._grasp_pose = []
@@ -139,14 +142,14 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         # Configure action space
         action_dim = self._robot.get_action_dimension()
-        if action_dim == 6: # position and orientation (euler angles)
+        if action_dim == 6:  # position and orientation (euler angles)
             action_high = np.array([0.08, 0.08, 0.08, 0.2, 0.2, 0.7])
             action_low = np.array([-0.08, -0.08, -0.08, -0.2, -0.2, -0.7])
 
-        elif action_dim == 7: # position and orientation (quaternion)
+        elif action_dim == 7:  # position and orientation (quaternion)
             action_high = np.array([0.08, 0.08, 0.08, 1, 1, 1, 1])
             action_low = np.array([-0.08, -0.08, -0.08, -1, -1, -1, -1])
-        else:
+        else:  # only position
             action_high = np.array([0.08, 0.08, 0.08])
             action_low = np.array([-0.08, -0.08, -0.08])
 
@@ -226,11 +229,15 @@ class PandaGraspResidualGymEnv(gym.Env):
         if ok:
             self._base_controller.compute_approach_path()
             base_action, _ = self._base_controller.get_next_action()
-            self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
+            for _ in range(self._action_repeat):
+                self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
+                p.stepSimulation(physicsClientId=self._physics_client_id)
+                if self._renders:
+                    time.sleep(self._time_step)
 
         self.debug_gui()
-        for _ in range(600):
-            p.stepSimulation(physicsClientId=self._physics_client_id)
+        p.stepSimulation(physicsClientId=self._physics_client_id)
+
 
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
