@@ -92,12 +92,12 @@ class WorldFetchEnv:
         # get object position
         obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id, physicsClientId=self._physics_client_id)
         observation.extend(list(obj_pos))
-        observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
+        observation_lim.extend(self._ws_lim)
 
         if self._control_eu_or_quat is 0:
             obj_euler = p.getEulerFromQuaternion(obj_orn)  # roll, pitch, yaw
             observation.extend(list(obj_euler))
-            observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
+            observation_lim.extend([[-m.pi, m.pi], [-m.pi, m.pi], [-m.pi, m.pi]])
         else:
             observation.extend(list(obj_orn))
             observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
@@ -107,19 +107,13 @@ class WorldFetchEnv:
     def set_obj_pose(self, new_pos, new_quat):
         p.resetBasePositionAndOrientation(self.obj_id, new_pos, new_quat, physicsClientId=self._physics_client_id)
 
-    def check_contact(self, link_id):
-        pts = p.getContactPoints(self.obj_id, link_id, physicsClientId=self._physics_client_id)
-        if len(pts) > 0:
-            print("<<----------->> contact with object!!!!! <<----------------->>")
-            return True
-        return False
+    def check_contact(self, body_id, obj_id=None):
+        if obj_id is None:
+            obj_id = self.obj_id
 
-    def check_table_contact(self, link_id):
-        pts = p.getContactPoints(self.table_id, link_id, physicsClientId=self._physics_client_id)
-        if len(pts) > 0:
-            print("<<----------->> contact with table!!!!! <<----------------->>")
-            return True
-        return False
+        pts = p.getContactPoints(obj_id, body_id, physicsClientId=self._physics_client_id)
+
+        return len(pts) > 0
 
     def debug_gui(self):
         p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.obj_id, physicsClientId=self._physics_client_id)

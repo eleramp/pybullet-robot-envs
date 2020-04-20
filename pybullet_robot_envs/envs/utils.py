@@ -307,5 +307,5 @@ def plot_observations_from_file(file):
     plt.show()
 
 
-# path = '/home/erampone/tmp_res/vel_l.txt'
-# plot_observations_from_file(path)
+path = '/home/r1-user/elena_ws/git_repos/rl_experiments/baseline_for_logging/multi_obj/sisq/panda_grasp_3objs-sac_residual/eu_object.txt'
+#plot_observations_from_file(path)

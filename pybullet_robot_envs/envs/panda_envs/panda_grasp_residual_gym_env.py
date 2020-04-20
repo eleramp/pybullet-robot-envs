@@ -27,7 +27,7 @@ class PandaGraspResidualGymEnv(gym.Env):
                  action_repeat=60,
                  control_orientation=1,
                  control_eu_or_quat=0,
-                 normalize_obs = True,
+                 normalize_obs=True,
                  obj_name=None,
                  obj_pose_rnd_std=0.05,
                  noise_pcl=0.00,
@@ -61,13 +61,14 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._last_frame_time = 0
         self._use_superq = use_superq
         self._distance_threshold = 0.1
+        self._cum_reward = np.float32(0.0)
 
         self._log_file = []
         self._log_file_path = []
         if DO_LOGGING:
-            self._log_file_path.append(os.path.join(log_file, 'sq_dim.txt'))
-            self._log_file_path.append(os.path.join(log_file, 'vel_l.txt'))
-            self._log_file_path.append(os.path.join(log_file, 'vel_a.txt'))
+            self._log_file_path.append(os.path.join(log_file, 'eu_hand.txt'))
+            self._log_file_path.append(os.path.join(log_file, 'pos_sq_wrt_hand.txt'))
+            self._log_file_path.append(os.path.join(log_file, 'eu_sq_wrt_hand.txt'))
             self._log_file.append(open(self._log_file_path[0], "w+"))
             self._log_file.append(open(self._log_file_path[1], "w+"))
             self._log_file.append(open(self._log_file_path[2], "w+"))
@@ -143,15 +144,15 @@ class PandaGraspResidualGymEnv(gym.Env):
         # Configure action space
         action_dim = self._robot.get_action_dimension()
         if action_dim == 6:  # position and orientation (euler angles)
-            action_high = np.array([0.08, 0.08, 0.08, 0.2, 0.2, 0.7])
-            action_low = np.array([-0.08, -0.08, -0.08, -0.2, -0.2, -0.7])
+            action_high = np.array([0.04, 0.04, 0.04, 0.2, 0.2, 0.5])
+            action_low = np.array([-0.04, -0.04, -0.04, -0.2, -0.2, -0.5])
 
         elif action_dim == 7:  # position and orientation (quaternion)
-            action_high = np.array([0.08, 0.08, 0.08, 1, 1, 1, 1])
-            action_low = np.array([-0.08, -0.08, -0.08, -1, -1, -1, -1])
+            action_high = np.array([0.04, 0.04, 0.04, 1, 1, 1, 1])
+            action_low = np.array([-0.04, -0.04, -0.04, -1, -1, -1, -1])
         else:  # only position
-            action_high = np.array([0.08, 0.08, 0.08])
-            action_low = np.array([-0.08, -0.08, -0.08])
+            action_high = np.array([0.04, 0.04, 0.04])
+            action_low = np.array([-0.04, -0.04, -0.04])
 
         action_space = spaces.Box(action_low, action_high, dtype='float32')
 
@@ -202,10 +203,10 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         self._robot.pre_grasp()
 
-        if self._obj_name is None:
-            obj_name = get_ycb_objects_list()[self.np_random.randint(0, 4)]
-            self._world._obj_name = obj_name
-            print("obj_name {}".format(obj_name))
+        # reset world with new object
+        obj_name = get_ycb_objects_list()[self.np_random.randint(0, 4)] if self._obj_name is None else self._obj_name
+        self._world._obj_name = obj_name
+        print("obj_name {}".format(obj_name))
 
         self._world.reset()
         # Let the world run for a bit
@@ -229,7 +230,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         if ok:
             self._base_controller.compute_approach_path()
             base_action, _ = self._base_controller.get_next_action()
-            for _ in range(self._action_repeat):
+            for _ in range(self._action_repeat*3):
                 self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
                 p.stepSimulation(physicsClientId=self._physics_client_id)
                 if self._renders:
@@ -242,7 +243,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         robot_obs, _ = self._robot.get_observation()
         world_obs, _ = self._world.get_observation()
 
-        self._target_h_lift = world_obs[2] + 0.1
+        self._target_h_lift = world_obs[2] + 0.15
 
         self._t_grasp, self._t_lift = 0, 0
         self._grasping_step = 5
@@ -330,8 +331,10 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         # grasp pose
         gp = self._grasp_pose.copy()
+
         self._observation.extend(list(gp[:3]))
         observation_lim.extend(robot_obs_lim[:3])
+
         if self._control_eu_or_quat is 0:
             self._observation.extend(list(gp[3:6]))
             observation_lim.extend(robot_obs_lim[3:6])
@@ -341,6 +344,7 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         # object pose
         world_observation, world_obs_lim = self._world.get_observation()
+
         self._observation.extend(list(world_observation))
         observation_lim.extend(world_obs_lim)
 
@@ -370,8 +374,9 @@ class PandaGraspResidualGymEnv(gym.Env):
             #
             self._observation.extend([sq_dim[0][0], sq_dim[1][0], sq_dim[2][0],
                                       sq_exp[0][0], sq_exp[1][0]])
+
             # check dim limits of sq dim params
-            observation_lim.extend([[0, 0.5], [0, 0.5], [0, 0.5], [0, 2], [0, 2]]) ## check
+            observation_lim.extend([[0.0, 0.3], [0.0, 0.3], [0, 0.3], [-1, 1], [-1, 1]])
 
             # relative superq position wrt hand c.o.m. frame
             inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], r_quat)
@@ -379,7 +384,7 @@ class PandaGraspResidualGymEnv(gym.Env):
                                                                   sq_pos, sq_quat)
 
             self._observation.extend(list(sq_pos_in_hand))
-            observation_lim.extend(robot_obs_lim[:3]) ## check
+            observation_lim.extend([[-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]])
 
             if self._control_eu_or_quat is 0:
                 sq_euler_in_hand = p.getEulerFromQuaternion(sq_orn_in_hand)
@@ -418,6 +423,34 @@ class PandaGraspResidualGymEnv(gym.Env):
                 self._observation.extend(list(obj_orn_in_hand))
                 observation_lim.extend(robot_obs_lim[3:7])
 
+        # add next step on the trajectory
+        # if not self._base_controller._approach_path:  ## todo: CHAAAANGE IN A PROPER WAY
+        #     next_step = self._grasp_pose.copy()
+        #     next_step[2] += 0.2
+        #
+        #     self._observation.extend(list(next_step[:3]))
+        #     observation_lim.extend(robot_obs_lim[:3])
+        #
+        #     if self._control_eu_or_quat is 0:
+        #         self._observation.extend(list(next_step[3:6]))
+        #         observation_lim.extend(robot_obs_lim[3:6])
+        #     else:
+        #         self._observation.extend(list(p.getQuaternionFromEuler(next_step[3:6])))
+        #         observation_lim.extend(robot_obs_lim[3:7])
+        #
+        # else:
+        #
+        #     next_step = self._base_controller._approach_path[-1]
+        #     self._observation.extend(list(next_step[0]))
+        #     observation_lim.extend(robot_obs_lim[:3])
+        #
+        #     if self._control_eu_or_quat is 0:
+        #         self._observation.extend(list(p.getEulerFromQuaternion(next_step[1])))
+        #         observation_lim.extend(robot_obs_lim[3:6])
+        #     else:
+        #         self._observation.extend(list(next_step[1]))
+        #         observation_lim.extend(robot_obs_lim[3:7])
+
         return np.array(self._observation), observation_lim
 
     def apply_action(self, action):
@@ -433,29 +466,50 @@ class PandaGraspResidualGymEnv(gym.Env):
             if time_to_sleep > 0:
                 time.sleep(time_to_sleep)
 
-        # set new action
-        action = np.clip(action, self.action_space.low, self.action_space.high)
+        # ------------------------------ #
+        # --- read corrective action --- #
+        # ------------------------------ #
+
         pos_action = action[:3]
+
         if self._control_eu_or_quat is 0:
             quat_action = p.getQuaternionFromEuler(action[3:6])
+
         else:
             quat_action = action[3:7]
+            # check if it is an invalid quaternion
             if quat_action[0] == 0 and quat_action[1] == 0 and quat_action[2] == 0:
                 quat_action[3] = 1
 
-        # get action from base controller
+        # --------------------------------------- #
+        # --- get action from base controller --- #
+        # --------------------------------------- #
+
         self.last_approach_step = False
         if self._base_controller.is_approach_path_empty():
             self.last_approach_step = True
 
         base_action, done = self._base_controller.get_next_action()
 
-        final_action_pos = np.add(base_action[0], pos_action)
+        # --------------------------- #
+        # --- superimpose actions --- #
+        # --------------------------- #
 
+        final_action_pos = np.add(base_action[0], pos_action)
         final_action_quat = quat_multiplication(np.array(base_action[1]), np.array(quat_action))
 
-        for _ in range(self._action_repeat):
+        # ------------------------------------------ #
+        # --- send actions to robot and simulate --- #
+        # ------------------------------------------ #
+
+        terminate = False
+        it_step = 0
+        while it_step < self._action_repeat and not terminate:
+
+            it_step += 1
+
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
+
             p.stepSimulation(physicsClientId=self._physics_client_id)
             if self._renders:
                 time.sleep(self._time_step)
@@ -463,33 +517,50 @@ class PandaGraspResidualGymEnv(gym.Env):
             self._env_step_counter += 1
 
             w_obs, _ = self._world.get_observation()
-            if self._termination(w_obs):
-                break
+            # r_obs, _ = self._robot.get_observation()
+            # self._cum_reward += self._compute_reward(w_obs, r_obs, action)
 
-        self._grasping_step = 5
-        if self.last_approach_step:
+            if self._termination(w_obs):
+                terminate = True
+
+        # --- if it is the last step, try to grasp and lift the object --- #
+
+        if self.last_approach_step and not terminate:
+
+            # --> do grasp
+            self._grasping_step = 5
+
             while self._grasping_step > 0:
                 # move fingers
-                action_f = [0.01, 0.01]
+                action_f = [0.0, 0.0]
                 self._robot.apply_action_fingers(action_f)
+
                 p.stepSimulation(physicsClientId=self._physics_client_id)
                 if self._renders:
-                    time.sleep(0.02)
-                # n_step = 20
+                    time.sleep(self._time_step)
+
                 self._grasping_step -= 1
 
-            # do lift
+            # --> do lift
             final_action_pos[2] += 0.2
 
-            for _ in range(self._action_repeat*3):
+            it_step = 0
+            while it_step < self._action_repeat*3 and not terminate:
+
+                it_step += 1
+
                 self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist(), max_vel=1)
+
                 p.stepSimulation(physicsClientId=self._physics_client_id)
                 if self._renders:
                     time.sleep(self._time_step)
 
                 # w_obs, _ = self._world.get_observation()
+                # r_obs, _ = self._robot.get_observation()
+                # self._cum_reward += self._compute_reward(w_obs, r_obs, action)
+
                 # if self._termination(w_obs):
-                #     break
+                #     terminate = True
 
             self._env_step_counter = self._max_steps+1
 
@@ -501,6 +572,8 @@ class PandaGraspResidualGymEnv(gym.Env):
 
     def step(self, action):
 
+        # self._cum_reward = np.float32(0.0)
+
         # apply action on the robot
         applied_action = self.apply_action(action)
 
@@ -508,19 +581,20 @@ class PandaGraspResidualGymEnv(gym.Env):
         r_obs, _ = self._robot.get_observation()
 
         done = self._termination(w_obs)
-        reward = self._compute_reward(w_obs, r_obs)
+        reward = self._compute_reward(w_obs, r_obs, action)
 
         obs, _ = self.get_extended_observation()
 
         if DO_LOGGING:
-            self.dump_obs(obs[39:42], r_obs[6:9], r_obs[9:12])
+            self.dump_obs(r_obs[3:6], obs[-6:-3], obs[-3:])
+            # self.dump_obs(obs[39:42], r_obs[6:9], r_obs[9:12]) #  DUMP SQ_DIM, VEL_L, VEL_A
 
         scaled_obs = obs
         if self._normalize_obs:
             scaled_obs = scale_gym_data(self.observation_space, obs)
 
         # print("reward")
-        # print(reward)
+        # print(self._cum_reward)
 
         return scaled_obs, np.array(reward), np.array(done), {}
 
@@ -580,7 +654,7 @@ class PandaGraspResidualGymEnv(gym.Env):
             return np.float32(1.)
 
         # here check lift for termination
-        if self._object_lifted(w_obs[2], self._target_h_lift):
+        if self._object_lifted(w_obs[2], self._target_h_lift) and self.last_approach_step:
             print("SUCCESS")
             return np.float32(1.)
 
@@ -590,15 +664,20 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         return np.float32(0.)
 
-    def _compute_reward(self, w_obs, r_obs):
-        c1, c2, c3, r = np.float32(0.0), np.float32(0.0), np.float32(0.0), np.float32(0.0)
+    def _compute_reward(self, w_obs, r_obs, action):
+
+        c1, c2, c3 = np.float32(0.0), np.float32(0.0), np.float32(0.0)
+        r1, r2 = np.float32(0.0), np.float32(0.0)
 
         # cost 1: object touched
-        if self._world.check_contact(self._robot.robot_id):
-            c1 = np.float32(5.0)
+        if self._robot.check_collision(self._world.obj_id):
+            # print("<<----------->> 1. object collision <<----------------->>")
+            c1 = -np.float32(5)
 
-        if self._world.check_table_contact(self._robot.robot_id):
-            c1 = np.float32(5.0)
+        # cost 1.1: table touched
+        if self._world.check_contact(self._robot.robot_id, self._world.table_id):
+            # print("<<----------->> 2. table collision <<----------------->>")
+            c1 -= np.float32(5)
 
         # cost 2: object falls
         if self._control_eu_or_quat is 1:
@@ -607,27 +686,52 @@ class PandaGraspResidualGymEnv(gym.Env):
             eu = w_obs[3:6]
 
         if self._object_fallen(eu[0], eu[1]):
-            c2 = np.float32(20.0)
+            c2 = -np.float32(30.0)
 
         # cost 3: distance between hand and object
-        d = goal_distance(np.array(r_obs[:3]), np.array(w_obs[:3]))
-        w3 = 10
-        if d > self._distance_threshold:
-            c3 = w3 * m.fabs(d)
+        if not self.last_approach_step:
+            d = goal_distance(np.array(r_obs[:3]), np.array(w_obs[:3]))
+            w_d = 1  # / self._action_repeat
+            c3 = w_d * (-1 + self._compute_distance_reward(d, max_dist=self._distance_threshold))
 
-        # reward: when object lifted of target_h_object
-        if self._object_lifted(w_obs[2], self._target_h_lift):
-            r += np.float32(100.0)
-            c1 = 0
+            # cost 4: magnitude of action correction
+            d_a = np.linalg.norm(action)
+            w_d_a = 1  # / self._action_repeat
+            c3 += w_d_a * (-1 + self._compute_distance_reward(d_a, max_dist=0.04))
 
-        reward = r - (c1 + c2 + c3)
+        # reward 1: contact between object and fingertips
+        r1 = np.float32(5 * self._robot.check_contact_fingertips(self._world.obj_id))
+        # if r1 > 0:
+        #     print("<<----------->> 3. contact fingertips <<----------------->>")
+
+        # reward 2: when object lifted of target_h_object
+        if self.last_approach_step:
+            # d_lift = goal_distance(np.array([w_obs[2]]), np.array([self._target_h_lift]))
+            # r2 = self._compute_distance_reward(d_lift, max_dist=0.13)
+
+            if self._object_lifted(w_obs[2], self._target_h_lift):
+                # self._t_lift += self._time_step
+            # else:
+                # self._t_lift = 0
+
+            # if self._t_lift >= 0.3:
+                r2 += np.float32(100.0)
+
+        reward = r1 + r2 + (c1 + c2 + c3)
 
         return reward
+
+    def _compute_distance_reward(self, dist, max_dist):
+
+        w = - np.log(10e-5) / (max_dist ** 2)
+
+        return np.exp(-w * (dist ** 2))
+
 
     def _object_fallen(self, obj_roll, obj_pitch):
         return obj_roll <= -0.785 or obj_roll >= 0.785 or obj_pitch <= -0.785 or obj_pitch >= 0.785
 
-    def _object_lifted(self, z_obj, h_target, atol=0.05):
+    def _object_lifted(self, z_obj, h_target, atol=0.1):
         return z_obj >= h_target - atol
 
     def debug_gui(self):

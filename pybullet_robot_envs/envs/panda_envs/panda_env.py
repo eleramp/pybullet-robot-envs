@@ -140,18 +140,19 @@ class pandaEnv:
         if self._control_eu_or_quat is 0:
             euler = p.getEulerFromQuaternion(orn)
             observation.extend(list(euler))  # roll, pitch, yaw
-            observation_lim.extend([[-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi]])
+            observation_lim.extend(self._eu_lim)
         else:
             observation.extend(list(orn))  # roll, pitch, yaw
             observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
 
         if self._include_vel_obs:
-            vel_l = state[6]
-            vel_a = state[7]
+            # standardize by subtracting the mean and dividing by the std
+            vel_std = [0.04, 0.07, 0.03]
+            vel_mean = [0.0, 0.01, 0.0]
+            vel_l = np.subtract(state[6], vel_mean)
+            vel_l = np.divide(vel_l, vel_std)
             observation.extend(list(vel_l))
             observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
-            observation.extend(list(vel_a))
-            observation_lim.extend([[-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi], [-2 * m.pi, 2 * m.pi]])
 
         jointStates = p.getJointStates(self.robot_id, self._motor_idxs, physicsClientId=self._physics_client_id)
         jointPoses = [x[0] for x in jointStates]
@@ -165,8 +166,6 @@ class pandaEnv:
         self.apply_action_fingers((0.04, 0.04))
         for _ in range(0,10):
             p.stepSimulation(physicsClientId=self._physics_client_id)
-        f1 = p.getLinkState(self.robot_id, self._motor_idxs[-2], physicsClientId=self._physics_client_id)[0]
-        f2 = p.getLinkState(self.robot_id, self._motor_idxs[-1], physicsClientId=self._physics_client_id)[0]
 
     def apply_action_fingers(self, action):
         assert len(action) == 2, ('finger joints are 2! The number of actions you passed is ', len(action))
@@ -256,31 +255,46 @@ class pandaEnv:
                                         force=500,
                                         physicsClientId=self._physics_client_id)
 
+    def check_collision(self, obj_id):
+        # check if there is any collision with an object
+
+        contact_pts = p.getContactPoints(obj_id, self.robot_id, physicsClientId=self._physics_client_id)
+
+        # check if the contact is on the fingertip(s)
+        n_fingertips_contact = self.check_contact_fingertips(obj_id)
+
+        return (len(contact_pts) - n_fingertips_contact) > 0
+
     def check_contact_fingertips(self, obj_id):
+        # check if there is any contact on the internal part of the fingers, to check if they are correctly touching an object
+
         p0 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=self._motor_idxs[-2], physicsClientId=self._physics_client_id)
         p1 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=self._motor_idxs[-1], physicsClientId=self._physics_client_id)
 
-        fingers_in_contact = 0
-
-        p0_f = 0
+        p0_contact = 0
         if len(p0) > 0:
-            fingers_in_contact += 1
-            print("p0! {}".format(len(p0)))
+            # get cartesian position of the finger link frame in world coordinates
+            w_pos_f0 = p.getLinkState(self.robot_id, self._motor_idxs[-2], physicsClientId=self._physics_client_id)[4:6]
+
+            # compute relative position of the contact point wrt the finger link frame
+            f0_pos_w = p.invertTransform(w_pos_f0[0], w_pos_f0[1])
+
             for pp in p0:
-                p0_f += pp[9]
-            p0_f /= len(p0)
-            #print("\t\t p0 normal force! {}".format(p0_f))
+                f0_pos_pp = p.multiplyTransforms(f0_pos_w[0], f0_pos_w[1], pp[6], f0_pos_w[1])
+                p0_contact += 1 if (f0_pos_pp[0][1] <= 0.001 and f0_pos_pp[0][2] < 0.55 and pp[8] > -0.005) else 0
 
-        p1_f = 0
+        p1_contact = 0
         if len(p1) > 0:
-            fingers_in_contact += 1
-            print("p1! {}".format(len(p1)))
-            for pp in p1:
-                p1_f += pp[9]
-            p1_f /= len(p1)
-            #print("\t\t p1 normal force! {}".format(p1_f))
+            w_pos_f1 = p.getLinkState(self.robot_id, self._motor_idxs[-1], physicsClientId=self._physics_client_id)[4:6]
 
-        return fingers_in_contact, [p0_f, p1_f]
+            # compute relative position of the contact point wrt the finger link frame
+            f1_pos_w = p.invertTransform(w_pos_f1[0], w_pos_f1[1])
+
+            for pp in p1:
+                f1_pos_pp = p.multiplyTransforms(f1_pos_w[0], f1_pos_w[1], pp[6], f1_pos_w[1])
+                p1_contact += 1 if (f1_pos_pp[0][1] >= -0.001 and f1_pos_pp[0][2] < 0.55 and pp[8] > -0.005) else 0
+
+        return (p0_contact > 0) + (p1_contact > 0)
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
