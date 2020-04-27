@@ -228,7 +228,6 @@ class PandaGraspResidualGymEnv(gym.Env):
         ok = self.compute_grasp_pose()
 
         if ok:
-            self._base_controller.compute_approach_path()
             base_action, _ = self._base_controller.get_next_action()
             for _ in range(self._action_repeat*3):
                 self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
@@ -299,6 +298,12 @@ class PandaGraspResidualGymEnv(gym.Env):
         ok = self._base_controller.estimate_grasp()
         if not ok:
             print("can't compute any grasp pose")
+            self.reset()
+            return False
+
+        ok = self._base_controller.compute_approach_path()
+        if not ok:
+            print("can't compute the approach path")
             self.reset()
             return False
 
@@ -396,15 +401,15 @@ class PandaGraspResidualGymEnv(gym.Env):
                 observation_lim.extend(robot_obs_lim[3:7])
 
         else:
-            world_observation, world_obs_lim = self._world.get_observation()
+            # world_observation, world_obs_lim = self._world.get_observation()
 
             if self._control_eu_or_quat is 0:
                 w_quat = p.getQuaternionFromEuler(world_observation[3:6])
             else:
                 w_quat = world_observation[3:7]
 
-            self._observation.extend(list(world_observation))
-            observation_lim.extend(world_obs_lim)
+            # self._observation.extend(list(world_observation))
+            # observation_lim.extend(world_obs_lim)
 
             # relative object position wrt hand c.o.m. frame
             inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], r_quat)
@@ -412,7 +417,7 @@ class PandaGraspResidualGymEnv(gym.Env):
                                                                     world_observation[:3], w_quat)
 
             self._observation.extend(list(obj_pos_in_hand))
-            observation_lim.extend(robot_obs_lim[:3])
+            observation_lim.extend([[-0.5, 0.5], [-0.5, 0.5], [-0.5, 0.5]])
 
             if self._control_eu_or_quat is 0:
                 obj_euler_in_hand = p.getEulerFromQuaternion(obj_orn_in_hand)
@@ -580,6 +585,10 @@ class PandaGraspResidualGymEnv(gym.Env):
         w_obs, _ = self._world.get_observation()
         r_obs, _ = self._robot.get_observation()
 
+        info = {
+            'is_success': self._is_success(w_obs),
+        }
+
         done = self._termination(w_obs)
         reward = self._compute_reward(w_obs, r_obs, action)
 
@@ -596,7 +605,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         # print("reward")
         # print(self._cum_reward)
 
-        return scaled_obs, np.array(reward), np.array(done), {}
+        return scaled_obs, np.array(reward), np.array(done), info
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -663,6 +672,13 @@ class PandaGraspResidualGymEnv(gym.Env):
             return np.float32(1.)
 
         return np.float32(0.)
+
+    def _is_success(self, w_obs):
+        if self._object_lifted(w_obs[2], self._target_h_lift) and self.last_approach_step:
+            print("SUCCESS")
+            return np.float32(1.)
+        else:
+            return np.float32(0.)
 
     def _compute_reward(self, w_obs, r_obs, action):
 
