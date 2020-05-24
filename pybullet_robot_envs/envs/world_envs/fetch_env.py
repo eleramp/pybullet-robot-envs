@@ -127,9 +127,9 @@ class WorldFetchEnv:
     def _sample_pose(self):
         # ws_lim = self._ws_lim
         x_min = self._ws_lim[0][0] + 0.064668
-        x_max = self._ws_lim[0][1] - 0.05
+        x_max = self._ws_lim[0][1] - 0.1
 
-        px = x_min + 0.4 * (x_max - x_min)
+        px = x_min + 0.5 * (x_max - x_min)
         py = self._ws_lim[1][0] + 0.5 * (self._ws_lim[1][1] - self._ws_lim[1][0])
         if self._obj_name is 'YcbCrackerBox':
             pz = self._h_table + 0.1
@@ -152,7 +152,7 @@ class WorldFetchEnv:
             py = np.clip(py, self._ws_lim[1][0], self._ws_lim[1][1])
 
             # Add uniform noise to yaw orientation
-            quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=-1/4*m.pi, high=1/4*m.pi)])
+            quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=-m.pi, high=m.pi)])
 
         obj_pose = (px, py, pz) + quat
 
