@@ -27,12 +27,12 @@ class iCubHandsEnv(iCubEnv):
         self._control_eu_or_quat = control_eu_or_quat
         self._use_simulation = 1
 
-        self._indices_torso = range(12, 15)
-        self._indices_left_arm = range(15, 22)
-        self._indices_left_hand = range(22, 42)
-        self._indices_right_arm = range(45, 52)
-        self._indices_right_hand = range(52, 72)
-        self._indices_head = range(42, 45)
+        self._indices_torso = range(16, 19)
+        self._indices_left_arm = [19, 20, 21, 23, 24, 25, 26]
+        self._indices_left_hand = range(27, 47)
+        self._indices_right_arm = [50, 51, 52, 54, 55, 56, 57]
+        self._indices_right_hand = range(58, 78)
+        self._indices_head = range(47, 50)
         self._end_eff_idx = []
 
         self._home_pos_torso = [0.0, 0.0, 0.0]  # degrees
@@ -49,7 +49,7 @@ class iCubHandsEnv(iCubEnv):
 
         self._grasp_pos = [0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 0, 0.75, 0.5, 0.5, 1.57, 0.4, 0.2, 0.07]
 
-        self._workspace_lim = [[0.2, 0.43], [-0.2, 0.2], [0.5, 1.0]]
+        self._workspace_lim = [[0.15, 0.50], [-0.3, 0.3], [0.5, 1.0]]
         self._eu_lim = [[-m.pi, m.pi],[-m.pi, m.pi], [-m.pi, m.pi]]
 
         self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default
@@ -61,7 +61,7 @@ class iCubHandsEnv(iCubEnv):
             self._home_hand_pose = [0.2, 0.2, 0.8, -m.pi, 0, -m.pi/2]   # x,y,z, roll,pitch,yaw
             self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, -m.pi]]
         else:
-            self._home_hand_pose = [0.2, -0.2, 0.8, 0, 0, m.pi / 2]
+            self._home_hand_pose = [0.2, -0.2, 0.8, 0, 0, 0]
             self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [0, m.pi]]
 
         self.seed()
@@ -143,6 +143,7 @@ class iCubHandsEnv(iCubEnv):
 
         if self._use_IK:
             self.apply_action(self._home_hand_pose)
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
     def _com_to_link_hand_frame(self):
         if self._control_arm is 'r':
@@ -164,14 +165,16 @@ class iCubHandsEnv(iCubEnv):
 
         if self._control_arm is 'l':
             idx_thumb = self._indices_left_hand[-4]
+            idx_fingers = self._indices_left_hand
         else:
             idx_thumb = self._indices_right_hand[-4]
+            idx_fingers = self._indices_right_hand
 
         steps = [i / 100 for i in range(100, -1, -1)]
         for s in steps:
             next_pos = np.multiply(pos, s)
-            p.setJointMotorControlArray(self.robot_id, range(52, 72), p.POSITION_CONTROL, targetPositions=next_pos,
-                                        forces=[20] * len(range(52, 72)), physicsClientId=self._physics_client_id)
+            p.setJointMotorControlArray(self.robot_id, idx_fingers, p.POSITION_CONTROL, targetPositions=next_pos,
+                                        forces=[20] * len(idx_fingers), physicsClientId=self._physics_client_id)
 
             p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=50,
                                     physicsClientId=self._physics_client_id)
@@ -211,7 +214,6 @@ class iCubHandsEnv(iCubEnv):
         p.setJointMotorControl2(self.robot_id, idx_thumb, p.POSITION_CONTROL, targetPosition=1.57, force=500,
                                 physicsClientId=self._physics_client_id)
 
-
     def grasp(self, step):
         # close fingers
         if self._control_arm is 'l':
@@ -221,10 +223,12 @@ class iCubHandsEnv(iCubEnv):
             idx_thumb = self._indices_right_hand[-4]
             idx_fingers = self._indices_right_hand
 
-        #joint_states = p.getJointStates(self.robot_id, self._motor_idxs[-20:])
-        #joint_poses = [x[0] for x in joint_states]
-        #p.setJointMotorControlArray(self.robot_id, self._motor_idxs[-20:], p.POSITION_CONTROL, targetPositions=joint_poses,
-        #                            forces=[50] * len(self._motor_idxs[-20:]))
+        joint_states = p.getJointStates(self.robot_id, self._motor_idxs[:-len(idx_fingers)])
+        joint_poses = [x[0] for x in joint_states]
+        p.setJointMotorControlArray(self.robot_id, self._motor_idxs[:-len(idx_fingers)], p.POSITION_CONTROL,
+                                    targetPositions=joint_poses,
+                                    forces=[500] * len(self._motor_idxs[:-len(idx_fingers)]),
+                                    physicsClientId=self._physics_client_id)
 
         if 0:
             next_pos = np.multiply(self._grasp_pos, step)
@@ -313,12 +317,13 @@ class iCubHandsEnv(iCubEnv):
 
         return fingers_in_contact, [p0_f, p1_f, p2_f, p3_f, p4_f]
 
-    def checkContacts(self, obj_id):
-        points = p.getContactPoints(self.robot_id, obj_id, physicsClientId=self._physics_client_id)
+    def check_collision(self, obj_id):
+        # check if there is any collision with an object
 
-        if len(points) > 0:
-            print("contacts! {}".format(len(points)))
-            return True
+        contact_pts = p.getContactPoints(obj_id, self.robot_id, physicsClientId=self._physics_client_id)
 
-        return False
+        # check if the contact is on the fingertip(s)
+        n_fingertips_contact, _ = self.check_contact_fingertips(obj_id)
+
+        return (len(contact_pts) - n_fingertips_contact) > 0
 

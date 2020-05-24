@@ -43,7 +43,7 @@ class iCubEnv:
         self._home_hand_pose = []
 
         self._workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
-        self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi, m.pi]]
+        self._eu_lim = [[-m.pi, m.pi], [-m.pi, m.pi], [-m.pi, m.pi]]
 
         self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default
 
@@ -142,8 +142,11 @@ class iCubEnv:
 
         return lower_limits, upper_limits, joint_ranges, rest_poses, joint_dumping
 
-    def get_ws_lim(self):
-        return self._workspace_lim
+    def get_workspace(self):
+        return [i[:] for i in self._workspace_lim]
+
+    def set_workspace(self, ws):
+        self._workspace_lim = [i[:] for i in ws]
 
     def get_action_dim(self):
         if not self._use_IK:
@@ -177,7 +180,7 @@ class iCubEnv:
         if self._control_eu_or_quat is 0:
             euler = p.getEulerFromQuaternion(orn)
             observation.extend(list(euler))  # roll, pitch, yaw
-            observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
+            observation_lim.extend(self._eu_lim)
         else:
             observation.extend(list(orn))  # roll, pitch, yaw
             observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
@@ -185,57 +188,6 @@ class iCubEnv:
         # cartesian velocities (linear and angular)
         observation.extend(list(vel_l))
         observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
-        observation.extend(list(vel_a))
-        observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
-
-        # finger tips
-        # tips_idxs = [3,7,11,15,19]
-        # if self._control_arm is 'l':
-        #     finger_idxs = self._indices_left_hand
-        # else:
-        #     finger_idxs = self._indices_right_hand
-
-        # tip_1 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[0]], physicsClientId=self._physics_client_id)
-        # tip_2 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[1]], physicsClientId=self._physics_client_id)
-        # tip_3 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[2]], physicsClientId=self._physics_client_id)
-        # tip_4 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[3]], physicsClientId=self._physics_client_id)
-        # tip_5 = p.getLinkState(self.robot_id, finger_idxs[tips_idxs[4]], physicsClientId=self._physics_client_id)
-
-        # # finger tips positions
-        # observation.extend(list(tip_1[0]))
-        # observation_lim.extend(list(self._workspace_lim))
-        # observation.extend(list(tip_2[0]))
-        # observation_lim.extend(list(self._workspace_lim))
-        # observation.extend(list(tip_3[0]))
-        # observation_lim.extend(list(self._workspace_lim))
-        # observation.extend(list(tip_4[0]))
-        # observation_lim.extend(list(self._workspace_lim))
-        # observation.extend(list(tip_5[0]))
-        # observation_lim.extend(list(self._workspace_lim))
-        #
-        # # finger tips orientations
-        # if self._control_eu_or_quat is 0:
-        #     observation.extend(list(p.getEulerFromQuaternion(tip_1[1])))
-        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
-        #     observation.extend(list(p.getEulerFromQuaternion(tip_2[1])))
-        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
-        #     observation.extend(list(p.getEulerFromQuaternion(tip_3[1])))
-        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
-        #     observation.extend(list(p.getEulerFromQuaternion(tip_4[1])))
-        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
-        #     observation.extend(list(p.getEulerFromQuaternion(tip_5[1])))
-        #     observation_lim.extend([[-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi], [-2*m.pi, 2*m.pi]])
-        # else:
-        #     observation.extend(list(tip_1[1]))
-        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
-        #     observation.extend(list(tip_2[1]))
-        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
-        #     observation.extend(list(tip_3[1]))
-        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
-        #     observation.extend(list(tip_4[1]))
-        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
-        #     observation.extend(list(tip_5[1]))
-        #     observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
 
         # joints poses
         joint_states = p.getJointStates(self.robot_id, self._motor_idxs, physicsClientId=self._physics_client_id)
@@ -253,7 +205,7 @@ class iCubEnv:
 
         return com_T_link_hand
 
-    def apply_action(self, action):
+    def apply_action(self, action, max_vel=None):
         if self._use_IK:
 
             if not (len(action) == 3 or len(action) == 6 or len(action) == 7):
@@ -309,14 +261,23 @@ class iCubEnv:
                         # minimize error is:
                         # error = position_gain * (desired_position - actual_position) +
                         #         velocity_gain * (desired_velocity - actual_velocity)
-
-                        p.setJointMotorControl2(bodyUniqueId=self.robot_id,
-                                                jointIndex=i,
-                                                controlMode=p.POSITION_CONTROL,
-                                                targetPosition=jointPoses[i],
-                                                targetVelocity=0,
-                                                force=500,
-                                                physicsClientId=self._physics_client_id)
+                        if max_vel:
+                            p.setJointMotorControl2(bodyUniqueId=self.robot_id,
+                                                    jointIndex=i,
+                                                    controlMode=p.POSITION_CONTROL,
+                                                    targetPosition=jointPoses[i],
+                                                    targetVelocity=0,
+                                                    force=500,
+                                                    maxVelocity=max_vel,
+                                                    physicsClientId=self._physics_client_id)
+                        else:
+                            p.setJointMotorControl2(bodyUniqueId=self.robot_id,
+                                                    jointIndex=i,
+                                                    controlMode=p.POSITION_CONTROL,
+                                                    targetPosition=jointPoses[i],
+                                                    targetVelocity=0,
+                                                    force=500,
+                                                    physicsClientId=self._physics_client_id)
 
             else:
                 # reset the joint state (ignoring all dynamics, not recommended to use during simulation)
