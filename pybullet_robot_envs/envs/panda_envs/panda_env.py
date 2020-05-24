@@ -167,6 +167,31 @@ class pandaEnv:
         for _ in range(0,10):
             p.stepSimulation(physicsClientId=self._physics_client_id)
 
+    def get_fingertips_pose(self):
+        state = p.getLinkState(self.robot_id, self._motor_idxs[-2], physicsClientId=self._physics_client_id)
+        f1_pos = list(state[4])
+        f1_orn = list(state[5])
+
+        matrix = p.getMatrixFromQuaternion(f1_orn)
+        dcm = np.array([matrix[0:3], matrix[3:6], matrix[6:9]])
+        delta_pos = np.array(list(dcm.dot([0, 0, 0.045])))
+        f1_pos[0] += delta_pos[0]
+        f1_pos[1] += delta_pos[1]
+        f1_pos[2] += delta_pos[2]
+
+        state = p.getLinkState(self.robot_id, self._motor_idxs[-1], physicsClientId=self._physics_client_id)
+        f2_pos = list(state[4])
+        f2_orn = list(state[5])
+
+        matrix = p.getMatrixFromQuaternion(f2_orn)
+        dcm = np.array([matrix[0:3], matrix[3:6], matrix[6:9]])
+        delta_pos = np.array(list(dcm.dot([0, 0, 0.045])))
+        f2_pos[0] += delta_pos[0]
+        f2_pos[1] += delta_pos[1]
+        f2_pos[2] += delta_pos[2]
+
+        return tuple(((f1_pos + f1_orn), (f2_pos + f2_orn)))
+
     def apply_action_fingers(self, action):
         assert len(action) == 2, ('finger joints are 2! The number of actions you passed is ', len(action))
 
@@ -275,24 +300,22 @@ class pandaEnv:
         if len(p0) > 0:
             # get cartesian position of the finger link frame in world coordinates
             w_pos_f0 = p.getLinkState(self.robot_id, self._motor_idxs[-2], physicsClientId=self._physics_client_id)[4:6]
-
-            # compute relative position of the contact point wrt the finger link frame
             f0_pos_w = p.invertTransform(w_pos_f0[0], w_pos_f0[1])
 
             for pp in p0:
+                # compute relative position of the contact point wrt the finger link frame
                 f0_pos_pp = p.multiplyTransforms(f0_pos_w[0], f0_pos_w[1], pp[6], f0_pos_w[1])
-                p0_contact += 1 if (f0_pos_pp[0][1] <= 0.001 and f0_pos_pp[0][2] < 0.55 and pp[8] > -0.005) else 0
+                p0_contact += 1 if (f0_pos_pp[0][1] <= 0.001 and f0_pos_pp[0][2] < 0.055 and pp[8] > -0.005) else 0
 
         p1_contact = 0
         if len(p1) > 0:
             w_pos_f1 = p.getLinkState(self.robot_id, self._motor_idxs[-1], physicsClientId=self._physics_client_id)[4:6]
-
-            # compute relative position of the contact point wrt the finger link frame
             f1_pos_w = p.invertTransform(w_pos_f1[0], w_pos_f1[1])
 
             for pp in p1:
+                # compute relative position of the contact point wrt the finger link frame
                 f1_pos_pp = p.multiplyTransforms(f1_pos_w[0], f1_pos_w[1], pp[6], f1_pos_w[1])
-                p1_contact += 1 if (f1_pos_pp[0][1] >= -0.001 and f1_pos_pp[0][2] < 0.55 and pp[8] > -0.005) else 0
+                p1_contact += 1 if (f1_pos_pp[0][1] >= -0.001 and f1_pos_pp[0][2] < 0.055 and pp[8] > -0.005) else 0
 
         return (p0_contact > 0) + (p1_contact > 0)
 
