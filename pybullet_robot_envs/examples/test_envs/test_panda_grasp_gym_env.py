@@ -8,7 +8,6 @@ print(currentdir)
 parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
 
-from pybullet_robot_envs.envs.panda_envs.panda_reach_residual_gym_env import PandaReachResidualGymEnv
 from pybullet_robot_envs.envs.panda_envs.panda_grasp_residual_gym_env import PandaGraspResidualGymEnv
 import pybullet_data
 

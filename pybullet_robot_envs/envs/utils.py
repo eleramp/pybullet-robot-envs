@@ -76,6 +76,7 @@ def sph_coord(x: float, y: float, z: float):
     phi = m.atan2(y,x)
     return [ro, theta, phi]
 
+
 def scale_gym_data(data_space, data):
     """
     Rescale the gym data from [low, high] to [-1, 1]

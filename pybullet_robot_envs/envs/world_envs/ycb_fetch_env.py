@@ -7,8 +7,7 @@ import pybullet_data
 
 
 from pybullet_robot_envs.envs.world_envs.fetch_env import WorldFetchEnv
-import ycb_objects_models_sim
-from ycb_objects_models_sim import objects
+from pybullet_object_models import ycb_objects
 
 
 def get_ycb_objects_list():
@@ -76,6 +75,6 @@ class YcbWorldFetchEnv(WorldFetchEnv):
 
         # Load object. Randomize its start position if requested
         self._obj_init_pose = self._sample_pose()
-        self.obj_id = p.loadURDF(os.path.join(ycb_objects_models_sim.objects.getDataPath(), self._obj_name,  "model.urdf"),
+        self.obj_id = p.loadURDF(os.path.join(ycb_objects.getDataPath(), self._obj_name,  "model.urdf"),
                                  basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
                                  physicsClientId=self._physics_client_id)

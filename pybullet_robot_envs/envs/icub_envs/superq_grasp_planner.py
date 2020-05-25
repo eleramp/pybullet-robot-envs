@@ -11,7 +11,7 @@ os.sys.path.insert(0, currentdir)
 
 from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaternion, quaternion_to_axis_angle, sph_coord
 from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimatorApp, Visualizer
-import config_superq_grasp_planner as cfg
+from pybullet_robot_envs.envs.conf import config_superq_grasp_planner as cfg
 
 
 def get_real_icub_to_sim_robot():
