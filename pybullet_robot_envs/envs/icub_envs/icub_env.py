@@ -57,7 +57,7 @@ class iCubEnv:
         self._control_eu_or_quat = control_eu_or_quat
         self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default
 
-        self._end_eff_idx = []
+        self.end_eff_idx = []
 
         self._workspace_lim = [[0.1, 0.5], [-0.3, 0.3], [0.5, 1.0]]
         self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2]]
@@ -82,7 +82,7 @@ class iCubEnv:
         self.reset()
 
     def reset(self):
-        # TODO: would it be better to reset the pose of the robot instead of re-loading the sdf model? The problem could be related to the objects that changes at every reset(). check
+        # TODO: would it be better to reset the pose of the robot instead of re-loading the sdf model? The problem could be then related to the objects that changes at every reset(). check
 
         # Load robot model
         self.robot_id = p.loadSDF(os.path.join(icub_model_pybullet.get_data_path(), "icub_model.sdf"),
@@ -136,7 +136,7 @@ class iCubEnv:
                 if (self._control_arm == 'l' and joint_name == 'l_wrist_yaw') or \
                    (self._control_arm == 'r' and joint_name == 'r_wrist_yaw'):
 
-                    self._end_eff_idx = self._joint_name_to_ids[joint_name]
+                    self.end_eff_idx = self._joint_name_to_ids[joint_name]
 
         # get joint ranges
         self.ll, self.ul, self.jr, self.rs, self.jd = self.get_joint_ranges()
@@ -201,7 +201,7 @@ class iCubEnv:
         observation_lim = []
 
         # Get state of the end-effector link
-        state = p.getLinkState(self.robot_id, self._end_eff_idx, computeLinkVelocity=1,
+        state = p.getLinkState(self.robot_id, self.end_eff_idx, computeLinkVelocity=1,
                                 computeForwardKinematics=1, physicsClientId=self._physics_client_id)
 
         # ------------------------- #
@@ -265,15 +265,14 @@ class iCubEnv:
                                      '\n- 7: (dx,dy,dz,qx,qy,qz,w)'
                                      '\ninstead it is: ', len(action))
 
-            dx, dy, dz = action[:3]
-
             # --- Constraint end-effector pose inside the workspace --- #
 
+            dx, dy, dz = action[:3]
             new_pos = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], dx)),
                        min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], dy)),
                        min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], dz))]
 
-            # if orientation is not uder control, keep it fixed
+            # if orientation is not under control, keep it fixed
             if not self._control_orientation:
                 new_quat_orn = p.getQuaternionFromEuler(self._home_hand_pose[3:6])
 
@@ -293,7 +292,7 @@ class iCubEnv:
 
             # otherwise, use current orientation
             else:
-                new_quat_orn = p.getLinkState(self.robot_id, self._end_eff_idx, physicsClientId=self._physics_client_id)[5]
+                new_quat_orn = p.getLinkState(self.robot_id, self.end_eff_idx, physicsClientId=self._physics_client_id)[5]
 
             # --- compute joint positions with IK --- #
             # transform the new pose from COM coordinate to link coordinate, because calculateInverseKinematics() wants the link coordinate
@@ -301,7 +300,7 @@ class iCubEnv:
 
             link_hand_pose = p.multiplyTransforms(new_pos, new_quat_orn, com_T_link_hand, (0., 0., 0., 1.))
 
-            jointPoses = p.calculateInverseKinematics(self.robot_id, self._end_eff_idx,
+            jointPoses = p.calculateInverseKinematics(self.robot_id, self.end_eff_idx,
                                                       link_hand_pose[0], link_hand_pose[1],
                                                       jointDamping=self.jd,
                                                       maxNumIterations=100,
@@ -378,8 +377,8 @@ class iCubEnv:
                            physicsClientId=self._physics_client_id)
 
         p.addUserDebugLine([0, 0, 0], [0.1, 0, 0], [1, 0, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._end_eff_idx, physicsClientId=self._physics_client_id)
+                           parentLinkIndex=self.end_eff_idx, physicsClientId=self._physics_client_id)
         p.addUserDebugLine([0, 0, 0], [0, 0.1, 0], [0, 1, 0], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._end_eff_idx, physicsClientId=self._physics_client_id)
+                           parentLinkIndex=self.end_eff_idx, physicsClientId=self._physics_client_id)
         p.addUserDebugLine([0, 0, 0], [0, 0, 0.1], [0, 0, 1], parentObjectUniqueId=self.robot_id,
-                           parentLinkIndex=self._end_eff_idx, physicsClientId=self._physics_client_id)
+                           parentLinkIndex=self.end_eff_idx, physicsClientId=self._physics_client_id)

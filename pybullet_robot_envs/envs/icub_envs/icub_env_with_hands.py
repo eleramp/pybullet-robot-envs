@@ -140,7 +140,8 @@ class iCubHandsEnv(iCubEnv):
                 # - Save end-effector index:
                 if (self._control_arm == 'l' and joint_name == 'l_wrist_yaw') or \
                         (self._control_arm == 'r' and joint_name == 'r_wrist_yaw'):
-                    self._end_eff_idx = self._joint_name_to_ids[joint_name]
+
+                    self.end_eff_idx = self._joint_name_to_ids[joint_name]
 
         self.ll, self.ul, self.jr, self.rs, self.jd = self.get_joint_ranges()
 
