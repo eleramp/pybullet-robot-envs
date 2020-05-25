@@ -15,54 +15,79 @@ from pybullet_robot_envs.envs.icub_envs.icub_push_gym_env import iCubPushGymEnv
 from pybullet_robot_envs.envs.icub_envs.icub_push_gym_goal_env import iCubPushGymGoalEnv
 
 import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('--continueIK', action='store_const', const=1, dest="useIK",
-                    help='use continue Inverse Kinematic action')
-parser.add_argument('--arm', action='store', default='r', dest="arm",
-                    help="choose arm to control: 'l' - left or 'r'-right")
 
-def main(args):
 
-    use_IK = 1 # if args.useIK else 0
+def main(cart_control, joint_control, arm, random_policy):
 
-    env = iCubPushGymEnv(renders=True, control_arm=args.arm, use_IK=use_IK,
-                         discrete_action=0, control_orientation=1, obj_pose_rnd_std=0.05)
+    use_IK = 1 if cart_control else 0
+    use_IK = 0 if joint_control else 1
+
+    env = iCubPushGymEnv(renders=True, control_arm=arm, use_IK=use_IK, control_orientation=1, obj_pose_rnd_std=0.05)
     motorsIds = []
 
-    if (env._discrete_action):
-        dv = 12
-        motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0))
-    elif use_IK:
-        dv = 1
-        motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
-        motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
-        motorsIds.append(env._p.addUserDebugParameter("lhPosZ", -dv, dv, 0.0))
-        motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dv, dv, 0.0))
-        motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dv, dv, 0.0))
-        motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dv, dv, 0.0))
+    if not random_policy:
+        if use_IK:
+            dv = 1
+            motorsIds.append(env._p.addUserDebugParameter("lhPosX", -dv, dv, 0.0))
+            motorsIds.append(env._p.addUserDebugParameter("lhPosY", -dv, dv, 0.0))
+            motorsIds.append(env._p.addUserDebugParameter("lhPosZ", -dv, dv, 0.0))
+            motorsIds.append(env._p.addUserDebugParameter("lhRollx", -dv, dv, 0.0))
+            motorsIds.append(env._p.addUserDebugParameter("lhPitchy", -dv, dv, 0.0))
+            motorsIds.append(env._p.addUserDebugParameter("lhYawz", -dv, dv, 0.0))
 
-    else:
-        dv = 1
-        joints_idx = env._robot._motor_idxs
+        else:
+            dv = 1
+            joints_idx = env._robot._joints_to_control
 
-        for j in joints_idx:
-            info = env._p.getJointInfo(env._robot.robot_id, j)
-            jointName = info[1]
-            motorsIds.append(env._p.addUserDebugParameter(jointName.decode("utf-8"), -dv, dv, 0.0))
+            for j in joints_idx:
+                info = env._p.getJointInfo(env._robot.robot_id, j)
+                jointName = info[1]
+                motorsIds.append(env._p.addUserDebugParameter(jointName.decode("utf-8"), -dv, dv, 0.0))
 
     done = False
     for t in range(10000000):
         #env.render()
-        action = []
-        for motorId in motorsIds:
-            action.append(env._p.readUserDebugParameter(motorId))
 
-        action = int(action[0]) if env._discrete_action else action
+        if not random_policy:
+            action = []
+            for motorId in motorsIds:
+                action.append(env._p.readUserDebugParameter(motorId))
+
+        else:
+            action = env.action_space.sample()
 
         state, reward, done, info = env.step(action)
-        if t%100==0:
+
+        if t % 100 == 0:
             print("reward ", reward)
             print("done ", done)
 
+def parser_args():
+    """
+    parse the arguments for running the experiment
+    :return: (dict) the arguments
+    """
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--cartesian', action='store_const', const=1, dest="cart_control",
+                        help='action is the cartesian end-effector pose')
+
+    parser.add_argument('--joint', action='store_const', const=1, dest="joint_control",
+                        help='action is in joint position space')
+
+    parser.add_argument('--arm', action='store', default='l', dest="arm",
+                        help="choose arm to control: 'l' - left or 'r'-right")
+
+    parser.add_argument('--random_policy', action='store_const', const=1, dest="random_policy",
+                        help="Simulate a random policy instead of using sliders to control the action")
+
+    args = parser.parse_args()
+    dict_args = vars(args)
+    return dict_args
+
+
 if __name__ == '__main__':
-    main(parser.parse_args())
+    args = parser_args()
+    print('args')
+    print(args)
+    main(**args)
