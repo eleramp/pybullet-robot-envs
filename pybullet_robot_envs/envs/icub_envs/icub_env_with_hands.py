@@ -164,10 +164,8 @@ class iCubHandsEnv(iCubEnv):
         # open fingers
 
         if self._control_arm is 'l':
-            idx_thumb = self._joint_name_to_ids['l_hand::l_tj2']
             idx_fingers = [self._joint_name_to_ids[jn] for jn in self.joint_groups['l_hand']]
         else:
-            idx_thumb = self._joint_name_to_ids['r_hand::r_tj2']
             idx_fingers = [self._joint_name_to_ids[jn] for jn in self.joint_groups['r_hand']]
 
         pos = [0.0] * len(idx_fingers)
