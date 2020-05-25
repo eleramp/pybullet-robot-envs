@@ -55,15 +55,22 @@ class iCubEnv:
         self._use_IK = use_IK
         self._control_orientation = control_orientation
         self._control_eu_or_quat = control_eu_or_quat
+        self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default
 
         self._end_eff_idx = []
-
-        self._home_hand_pose = []
 
         self._workspace_lim = [[0.1, 0.5], [-0.3, 0.3], [0.5, 1.0]]
         self._eu_lim = [[-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2], [-m.pi/2, m.pi/2]]
 
-        self._control_arm = control_arm if control_arm == 'r' or control_arm == 'l' else 'l'  # left arm by default
+        # set initial hand pose
+        if self._control_arm == 'l':
+            self._home_hand_pose = [0.3, 0.26, 0.8, 0, 0, 0]  # x, y, z, roll, pitch, yaw
+            self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2]]
+
+        else:
+            self._home_hand_pose = [0.3, -0.26, 0.8, 0, 0, m.pi]
+            self._eu_lim = [[-m.pi / 2, m.pi / 2], [-m.pi / 2, m.pi / 2], [m.pi / 2, 3 / 2 * m.pi]]
+
         self._joints_to_control = []
         self._joint_name_to_ids = {}
 
@@ -109,7 +116,6 @@ class iCubEnv:
                 p.setJointMotorControl2(self.robot_id, i, p.POSITION_CONTROL, targetPosition=self.initial_positions[joint_name],
                                         positionGain=0.2, velocityGain=1.0,
                                         physicsClientId=self._physics_client_id)
-            p.stepSimulation()
 
         # save indices of the joints to control:
         if len(self._joints_to_control) is 0:
@@ -120,7 +126,7 @@ class iCubEnv:
                 if joint_name in self.joint_groups['torso']:
                     self._joints_to_control.append(self._joint_name_to_ids[joint_name])
 
-                # - right or left arm, depending on the task
+                # - right or left arm, depending on the arm to control
                 elif (joint_name in self.joint_groups['l_arm'] and self._control_arm == 'l') or \
                      (joint_name in self.joint_groups['r_arm'] and self._control_arm == 'r'):
 
@@ -134,13 +140,6 @@ class iCubEnv:
 
         # get joint ranges
         self.ll, self.ul, self.jr, self.rs, self.jd = self.get_joint_ranges()
-
-        # set initial hand pose
-        if self._control_arm == 'l':
-            self._home_hand_pose = [0.3, 0.26, 0.8, 0, 0, 0]  # x, y, z, roll, pitch, yaw
-        else:
-            self._home_hand_pose = [0.3, -0.26, 0.8, 0, 0, m.pi]
-            self._eu_lim[2] = [m.pi/2, 3/2 * m.pi]
 
         if self._use_IK:
             self.apply_action(self._home_hand_pose)
