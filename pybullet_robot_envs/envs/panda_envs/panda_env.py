@@ -34,7 +34,7 @@ class pandaEnv:
         self._include_vel_obs = includeVelObs
         self._control_eu_or_quat = control_eu_or_quat
 
-        self._workspace_lim = [[0.3, 0.7], [-0.3, 0.3], [0.65, 1.5]]
+        self._workspace_lim = [[0.25, 0.65], [-0.3, 0.3], [0.67, 1.5]]
         self._eu_lim = [[-m.pi, m.pi], [-m.pi, m.pi], [-m.pi, m.pi]]
 
         self.end_eff_idx = 11  # 8
@@ -82,9 +82,7 @@ class pandaEnv:
 
         if self._use_IK:
 
-            self._home_hand_pose = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], self._base_position[0])),
-                                    min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], self._base_position[1])),
-                                    min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], self._base_position[2] + 0.5)),
+            self._home_hand_pose = [0.0, 0.0, 1.2,
                                     min(m.pi, max(-m.pi, m.pi)),
                                     min(m.pi, max(-m.pi, -m.pi/4)),
                                     min(m.pi, max(-m.pi, 0))]
@@ -199,19 +197,33 @@ class pandaEnv:
     def pre_grasp(self):
         self.apply_action_fingers((0.04, 0.04))
 
-    def grasp(self):
-        self.apply_action_fingers((0.0, 0.0))
+    def grasp(self, obj_id):
+        self.apply_action_fingers((0.0, 0.0), obj_id)
 
-    def apply_action_fingers(self, action):
+    def apply_action_fingers(self, action, obj_id=None):
         # move finger joints in position control
         assert len(action) == 2, ('finger joints are 2! The number of actions you passed is ', len(action))
 
         idx_fingers = [self._joint_name_to_ids['panda_finger_joint1'], self._joint_name_to_ids['panda_finger_joint2']]
 
-        p.setJointMotorControlArray(bodyUniqueId=self.robot_id,
-                                    jointIndices=idx_fingers,
-                                    controlMode=p.POSITION_CONTROL,
-                                    targetPositions=action,
+        # use object id to check contact force and eventually stop the finger motion
+        if obj_id is not None:
+            _, forces = self.check_contact_fingertips(obj_id)
+            print("contact forces {}".format(forces))
+
+            if forces[0] >= 15.0:
+                action[0] = p.getJointState(self.robot_id, idx_fingers[0], physicsClientId=self._physics_client_id)[0]
+
+            if forces[1] >= 15.0:
+                action[1] = p.getJointState(self.robot_id, idx_fingers[1], physicsClientId=self._physics_client_id)[0]
+
+        for i, idx in enumerate(idx_fingers):
+            p.setJointMotorControl2(self.robot_id,
+                                    idx,
+                                    p.POSITION_CONTROL,
+                                    targetPosition=action[i],
+                                    force=10,
+                                    maxVelocity=1,
                                     physicsClientId=self._physics_client_id)
 
     def apply_action(self, action, max_vel=-1):
@@ -230,8 +242,7 @@ class pandaEnv:
             # --- Constraint end-effector pose inside the workspace --- #
 
             dx, dy, dz = action[:3]
-            new_pos = [min(self._workspace_lim[0][1], max(self._workspace_lim[0][0], dx)),
-                       min(self._workspace_lim[1][1], max(self._workspace_lim[1][0], dy)),
+            new_pos = [dx, dy,
                        min(self._workspace_lim[2][1], max(self._workspace_lim[2][0], dz))]
 
             # if orientation is not under control, keep it fixed
@@ -306,7 +317,7 @@ class pandaEnv:
         contact_pts = p.getContactPoints(obj_id, self.robot_id, physicsClientId=self._physics_client_id)
 
         # check if the contact is on the fingertip(s)
-        n_fingertips_contact = self.check_contact_fingertips(obj_id)
+        n_fingertips_contact, _ = self.check_contact_fingertips(obj_id)
 
         return (len(contact_pts) - n_fingertips_contact) > 0
 
@@ -319,6 +330,7 @@ class pandaEnv:
         p1 = p.getContactPoints(obj_id, self.robot_id, linkIndexB=idx_fingers[1], physicsClientId=self._physics_client_id)
 
         p0_contact = 0
+        p0_f = [0]
         if len(p0) > 0:
             # get cartesian position of the finger link frame in world coordinates
             w_pos_f0 = p.getLinkState(self.robot_id, idx_fingers[0], physicsClientId=self._physics_client_id)[4:6]
@@ -329,9 +341,14 @@ class pandaEnv:
                 f0_pos_pp = p.multiplyTransforms(f0_pos_w[0], f0_pos_w[1], pp[6], f0_pos_w[1])
 
                 # check if contact in the internal part of finger
-                p0_contact += 1 if (f0_pos_pp[0][1] <= 0.001 and f0_pos_pp[0][2] < 0.055 and pp[8] > -0.005) else 0
+                if f0_pos_pp[0][1] <= 0.001 and f0_pos_pp[0][2] < 0.055 and pp[8] > -0.005:
+                    p0_contact += 1
+                    p0_f.append(pp[9])
+
+        p0_f_mean = np.mean(p0_f)
 
         p1_contact = 0
+        p1_f = [0]
         if len(p1) > 0:
             w_pos_f1 = p.getLinkState(self.robot_id, idx_fingers[1], physicsClientId=self._physics_client_id)[4:6]
             f1_pos_w = p.invertTransform(w_pos_f1[0], w_pos_f1[1])
@@ -341,9 +358,13 @@ class pandaEnv:
                 f1_pos_pp = p.multiplyTransforms(f1_pos_w[0], f1_pos_w[1], pp[6], f1_pos_w[1])
 
                 # check if contact in the internal part of finger
-                p1_contact += 1 if (f1_pos_pp[0][1] >= -0.001 and f1_pos_pp[0][2] < 0.055 and pp[8] > -0.005) else 0
+                if f1_pos_pp[0][1] >= -0.001 and f1_pos_pp[0][2] < 0.055 and pp[8] > -0.005:
+                    p1_contact += 1
+                    p1_f.append(pp[9])
 
-        return (p0_contact > 0) + (p1_contact > 0)
+        p1_f_mean = np.mean(p0_f)
+
+        return (p0_contact > 0) + (p1_contact > 0), (p0_f_mean, p1_f_mean)
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
