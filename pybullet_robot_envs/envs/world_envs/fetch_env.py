@@ -81,6 +81,9 @@ class WorldFetchEnv:
         info[4] = p.getVisualShapeData(self.obj_id, -1, physicsClientId=self._physics_client_id)[0][4]
         return info
 
+    def get_workspace(self):
+        return [i[:] for i in self._ws_lim]
+
     def get_observation_dimension(self):
         obs, _ = self.get_observation()
         return len(obs)
@@ -126,15 +129,14 @@ class WorldFetchEnv:
 
     def _sample_pose(self):
         # ws_lim = self._ws_lim
-        x_min = self._ws_lim[0][0] + 0.064668
+        x_min = self._ws_lim[0][0] + 0.05
         x_max = self._ws_lim[0][1] - 0.1
+        y_min = self._ws_lim[1][0] + 0.05
+        y_max = self._ws_lim[1][1] - 0.05
 
         px = x_min + 0.5 * (x_max - x_min)
-        py = self._ws_lim[1][0] + 0.5 * (self._ws_lim[1][1] - self._ws_lim[1][0])
-        if self._obj_name is 'YcbCrackerBox':
-            pz = self._h_table + 0.1
-        else:
-            pz = self._h_table + 0.06
+        py = y_min + 0.5 * (y_max - y_min)
+        pz = self._h_table + 0.07
 
         quat = p.getQuaternionFromEuler([0.0, 0.0, 1/4*m.pi])
 
@@ -146,13 +148,13 @@ class WorldFetchEnv:
                      self.np_random.uniform(low=-self._obj_pose_rnd_std, high=self._obj_pose_rnd_std)]
 
             px = px + noise[0]
-            px = np.clip(px, x_min, x_max)
-
             py = py + noise[1]
-            py = np.clip(py, self._ws_lim[1][0], self._ws_lim[1][1])
 
             # Add uniform noise to yaw orientation
             quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=-m.pi, high=m.pi)])
+
+        px = np.clip(px, x_min, x_max)
+        py = np.clip(py, y_min, y_max)
 
         obj_pose = (px, py, pz) + quat
 
