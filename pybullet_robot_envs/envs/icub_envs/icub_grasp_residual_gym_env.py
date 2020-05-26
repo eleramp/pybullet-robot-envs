@@ -491,7 +491,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         if self.last_approach_step and not terminate:
 
             # --> do grasp
-            self._robot.grasp(0)
+            self._robot.grasp()
 
             ct_forces = [np.zeros(5)]
             while self._grasping_step > 0:
