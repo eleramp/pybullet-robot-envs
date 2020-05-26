@@ -12,21 +12,24 @@ os.sys.path.insert(0, currentdir)
 from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaternion, quaternion_to_axis_angle, sph_coord
 from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimatorApp, Visualizer
 from pybullet_robot_envs.envs.conf import config_superq_grasp_planner as cfg
+from pybullet_robot_envs.envs.common.Camera import InHandCamera
 
 
-def get_real_icub_to_sim_robot():
+def get_real_icub_to_sim_robot_hand_frame():
+    # For each robot model, it defines the transform wrt right and left real icub hand
     R = {
         cfg.robots[0]: [[-m.pi/2, 0.0, m.pi], [m.pi/2, 0.0, 0.0]],
-        cfg.robots[1]: [[0.0, -m.pi/2, m.pi/2], [0.0, -m.pi/2, m.pi/2]],
+        cfg.robots[1]: [[0.0, -m.pi/2, m.pi/2], [0.0, m.pi/2, m.pi/2]],
         cfg.robots[2]: [[0., 0., -m.pi/2], [[m.pi, 0., -m.pi/2]]]
     }
+
     return R
 
 
 class SuperqGraspPlanner:
 
     def __init__(self, physicsClientId, trajClientId, robot, obj_id, robot_name, object_name=None,
-                 robot_base_pose=((0.0,) * 3, (0.0,)*4),
+                 robot_base_pose=((0.0,) * 3, (0.0,) * 4),
                  grasping_hand='r',
                  noise_pcl=0.02,
                  render=True):
@@ -37,8 +40,8 @@ class SuperqGraspPlanner:
         self._grasping_hand = grasping_hand
         self._noise_pcl = noise_pcl
         self._robot_base_pose = robot_base_pose
-        # offset between icub hand's ref.frame in PyBullet and on the real robot --> TODO: make it less hard coded
-        self._real_icub_R_sim_robot = get_real_icub_to_sim_robot()[robot_name]
+
+        self._real_icub_R_sim_robot = get_real_icub_to_sim_robot_hand_frame()[robot_name]
         self._starting_pose = []
         self._best_grasp_pose = []
         self._approach_path = []
@@ -52,12 +55,44 @@ class SuperqGraspPlanner:
         self._object_name = object_name
         self._render = render
 
+        # camera
+        self.inHandCam = InHandCamera()
+
+        # superquadric lib bindings objects
         self._pointcloud = PointCloud()
         self._superqs = superquadric_bindings.vector_superquadric()
         self._sq_estimator = SuperqEstimatorApp()
         self._grasp_estimator = GraspEstimatorApp()
         if self._render:
             self._visualizer = Visualizer()
+
+        # ------ Set Visualizer parameters ------ #
+        if self._render:
+            self._visualizer.setPosition(cfg.visualizer['x'], cfg.visualizer['y'])
+            self._visualizer.setSize(cfg.visualizer['width'], cfg.visualizer['height'])
+
+            self._visualizer.resetPoints()
+            self._visualizer.resetSuperq()
+            self._visualizer.resetPoses()
+
+        # ------ Set Superquadric Model parameters ------ #
+        self._sq_estimator.SetNumericValue("tol", cfg.sq_model['tol'])
+        self._sq_estimator.SetIntegerValue("print_level", 0)
+        self._sq_estimator.SetIntegerValue("optimizer_points", cfg.sq_model['optimizer_points'])
+        self._sq_estimator.SetBoolValue("random_sampling", cfg.sq_model['random_sampling'])
+
+        # ------ Set Superquadric Grasp parameters ------ #
+        self._grasp_estimator.SetIntegerValue("print_level", 0)
+        self._grasp_estimator.SetNumericValue("tol", cfg.sq_grasp[self._robot_name]['tol'])
+        self._grasp_estimator.SetIntegerValue("max_superq", cfg.sq_grasp[self._robot_name]['max_superq'])
+        self._grasp_estimator.SetNumericValue("constr_tol", cfg.sq_grasp[self._robot_name]['constr_tol'])
+        self._grasp_estimator.SetStringValue("left_or_right", "right" if self._grasping_hand is 'r' else "left")
+        self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp[self._robot_name]['plane_table']))
+        self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp[self._robot_name]['displacement']))
+        self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp[self._robot_name]['hand_sq']))
+        self._grasp_estimator.setMatrix("bounds_right", np.array(cfg.sq_grasp[self._robot_name]['bounds_right']))
+        self._grasp_estimator.setMatrix("bounds_left", np.array(cfg.sq_grasp[self._robot_name]['bounds_left']))
+
         self._gp_reached = 0
 
         # initialize
@@ -77,35 +112,10 @@ class SuperqGraspPlanner:
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
 
-        if self._render:
-            self._visualizer.setPosition(cfg.visualizer['x'], cfg.visualizer['y'])
-            self._visualizer.setSize(cfg.visualizer['width'], cfg.visualizer['height'])
-
-            self._visualizer.resetPoints()
-            self._visualizer.resetSuperq()
-            self._visualizer.resetPoses()
-
-        # ------ Set Superquadric Model parameters ------ #
-        self._sq_estimator.SetNumericValue("tol", cfg.sq_model['tol'])
-        self._sq_estimator.SetIntegerValue("print_level", 0)
         if self._object_name is not None and self._object_name in cfg.objects.keys():
             self._sq_estimator.SetStringValue("object_class", cfg.objects[self._object_name])
         else:
             self._sq_estimator.SetStringValue("object_class", cfg.sq_model['object_class'])
-        self._sq_estimator.SetIntegerValue("optimizer_points", cfg.sq_model['optimizer_points'])
-        self._sq_estimator.SetBoolValue("random_sampling", cfg.sq_model['random_sampling'])
-
-        # ------ Set Superquadric Grasp parameters ------ #
-        self._grasp_estimator.SetIntegerValue("print_level", 0)
-        self._grasp_estimator.SetNumericValue("tol", cfg.sq_grasp[self._robot_name]['tol'])
-        self._grasp_estimator.SetIntegerValue("max_superq", cfg.sq_grasp[self._robot_name]['max_superq'])
-        self._grasp_estimator.SetNumericValue("constr_tol", cfg.sq_grasp[self._robot_name]['constr_tol'])
-        self._grasp_estimator.SetStringValue("left_or_right", "right" if self._grasping_hand is 'r' else "left")
-        self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp[self._robot_name]['plane_table']))
-        self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp[self._robot_name]['displacement']))
-        self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp[self._robot_name]['hand_sq']))
-        self._grasp_estimator.setMatrix("bounds_right", np.array(cfg.sq_grasp[self._robot_name]['bounds_right']))
-        self._grasp_estimator.setMatrix("bounds_left", np.array(cfg.sq_grasp[self._robot_name]['bounds_left']))
 
         return
 
@@ -115,7 +125,56 @@ class SuperqGraspPlanner:
     def set_object_info(self, obj_info):
         self._obj_info = obj_info
 
-    def compute_object_pointcloud(self, obj_pose):
+    def compute_object_pointcloud(self, hand_pose):
+
+        # --- compute point cloud of the object --- #
+        obj_points, obj_colors = self.inHandCam.calc_point_cloud(self._robot.robot_id, self._physics_client_id, 30, 30,
+                                                         with_noise=True, obj_id=self._obj_id)
+
+        # --- transform points from cam frame to world frame --- #
+
+        # get camera Transform wrt pybullet world
+        w_py_P_cam, w_py_quat_cam, w_py_R_cam = self.inHandCam.getPosRot(self._robot.robot_id, self._physics_client_id)
+
+        w_py_T_cam = np.append(w_py_R_cam, np.array([w_py_P_cam]).T, axis=1)
+        w_py_T_cam = np.append(w_py_T_cam, np.array([[0, 0, 0, 1]]), axis=0)
+
+        # Transform from pybullet world to icub world (on the hip)
+        w_py_R_w_icub = p.getMatrixFromQuaternion((0.0, 0.0, -1.0, 0.0))
+        w_py_R_w_icub = np.array(w_py_R_w_icub).reshape(3, 3)
+        w_py_T_w_icub = np.append(w_py_R_w_icub, np.array([self._robot_base_pose[0]]).T, axis=1)
+        w_py_T_w_icub = np.append(w_py_T_w_icub, np.array([[0, 0, 0, 1]]), axis=0)
+        w_icub_T_w_py = np.linalg.inv(w_py_T_w_icub)
+
+        w_icub_T_cam = np.matmul(w_icub_T_w_py, w_py_T_cam)
+
+        bindings_points = superquadric_bindings.deque_Vector3d()
+        bindings_colors = superquadric_bindings.vector_vector_uchar()
+
+        for i, pt in enumerate(obj_points):
+            w_icub_pt = w_icub_T_cam.dot(np.append(pt, 1))
+
+            bindings_points.push_back(w_icub_pt[:3])
+            col = (obj_colors[i][:3]*255).astype(int)
+            bindings_colors.push_back(col.tolist())
+
+            # if i % 100 is 0:
+            #     p.addUserDebugLine(v3, [v3[0] + 0.001, v3[1], v3[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
+            #                       lifeTime=300, parentObjectUniqueId=self._robot.robot_id, physicsClientId=self._physics_client_id)
+
+        if bindings_points.size() >= cfg.sq_model['minimum_points']:
+            self._pointcloud.setPoints(bindings_points)
+            self._pointcloud.setColors(bindings_colors)
+
+            print("new point cloud with {} points".format(self._pointcloud.getNumberPoints()))
+            if self._render:
+                self._visualizer.addPoints(self._pointcloud, False)
+
+            return True
+        else:
+            return False
+
+    def compute_object_pointcloud_from_mesh(self, obj_pose):
         # Create object's point cloud from its mesh
 
         if not self._obj_info:
@@ -333,14 +392,14 @@ class SuperqGraspPlanner:
 
         step_dist = dist_max/n_via_points
 
-        state = p.getLinkState(self._robot.robot_id, self._robot.endEffLink,
+        state = p.getLinkState(self._robot.robot_id, self._robot.end_eff_idx,
                                computeForwardKinematics=1, physicsClientId=self._traj_client_id)
         err_traj = 0.01
         count = 0
-        while goal_distance(np.array(state[0]), np.array(grasp_pose[:3])) >= err_traj and count <= 10e3:
+        while goal_distance(np.array(state[0]), np.array(grasp_pose[:3])) >= err_traj and count <= 5e3:
             self._robot.apply_action(grasp_pose, max_vel=0.5)
             p.stepSimulation(self._traj_client_id)
-            state = p.getLinkState(self._robot.robot_id, self._robot.endEffLink, physicsClientId=self._traj_client_id)
+            state = p.getLinkState(self._robot.robot_id, self._robot.end_eff_idx, physicsClientId=self._traj_client_id)
             curr_dist = goal_distance(np.array(state[0]), np.array(grasp_pose[:3]))
             if curr_dist <= step_dist*n_via_points:
                 self._approach_path.append((state[0], state[1]))

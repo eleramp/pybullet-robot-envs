@@ -14,10 +14,10 @@ from superquadric_bindings import PointCloud, SuperqEstimatorApp, GraspEstimator
 from pybullet_robot_envs.envs.conf import config_superq_grasp_planner as cfg
 
 
-def get_real_icub_to_sim_robot():
+def get_real_icub_to_sim_robot_hand_frame():
     R = {
         cfg.robots[0]: [[-m.pi/2, 0.0, m.pi], [m.pi/2, 0.0, 0.0]],
-        cfg.robots[1]: [[0.0, -m.pi/2, m.pi/2], [0.0, -m.pi/2, m.pi/2]],
+        cfg.robots[1]: [[0.0, -m.pi/2, m.pi/2], [0.0, m.pi/2, m.pi/2]],
         cfg.robots[2]: [[0., 0., -m.pi/2], [[m.pi, 0., -m.pi/2]]]
     }
     return R
@@ -36,7 +36,7 @@ class SuperqGraspPlanner:
         self._noise_pcl = noise_pcl
         self._robot_base_pose = robot_base_pose
         # offset between icub hand's ref.frame in PyBullet and on the real robot --> TODO: make it less hard coded
-        self._real_icub_R_sim_robot = get_real_icub_to_sim_robot()[robot_name]
+        self._real_icub_R_sim_robot = get_real_icub_to_sim_robot_hand_frame()[robot_name]
         self._starting_pose = []
         self._best_grasp_pose = []
         self._approach_path = []
@@ -56,6 +56,34 @@ class SuperqGraspPlanner:
         self._grasp_estimator = GraspEstimatorApp()
         if self._render:
             self._visualizer = Visualizer()
+
+        # ------ Set Visualizer parameters ------ #
+        if self._render:
+            self._visualizer.setPosition(cfg.visualizer['x'], cfg.visualizer['y'])
+            self._visualizer.setSize(cfg.visualizer['width'], cfg.visualizer['height'])
+
+            self._visualizer.resetPoints()
+            self._visualizer.resetSuperq()
+            self._visualizer.resetPoses()
+
+        # ------ Set Superquadric Model parameters ------ #
+        self._sq_estimator.SetNumericValue("tol", cfg.sq_model['tol'])
+        self._sq_estimator.SetIntegerValue("print_level", 0)
+        self._sq_estimator.SetIntegerValue("optimizer_points", cfg.sq_model['optimizer_points'])
+        self._sq_estimator.SetBoolValue("random_sampling", cfg.sq_model['random_sampling'])
+
+        # ------ Set Superquadric Grasp parameters ------ #
+        self._grasp_estimator.SetIntegerValue("print_level", 0)
+        self._grasp_estimator.SetNumericValue("tol", cfg.sq_grasp[self._robot_name]['tol'])
+        self._grasp_estimator.SetIntegerValue("max_superq", cfg.sq_grasp[self._robot_name]['max_superq'])
+        self._grasp_estimator.SetNumericValue("constr_tol", cfg.sq_grasp[self._robot_name]['constr_tol'])
+        self._grasp_estimator.SetStringValue("left_or_right", "right" if self._grasping_hand is 'r' else "left")
+        self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp[self._robot_name]['plane_table']))
+        self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp[self._robot_name]['displacement']))
+        self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp[self._robot_name]['hand_sq']))
+        self._grasp_estimator.setMatrix("bounds_right", np.array(cfg.sq_grasp[self._robot_name]['bounds_right']))
+        self._grasp_estimator.setMatrix("bounds_left", np.array(cfg.sq_grasp[self._robot_name]['bounds_left']))
+
         self._gp_reached = 0
 
         # initialize
@@ -76,35 +104,10 @@ class SuperqGraspPlanner:
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
 
-        if self._render:
-            self._visualizer.setPosition(cfg.visualizer['x'], cfg.visualizer['y'])
-            self._visualizer.setSize(cfg.visualizer['width'], cfg.visualizer['height'])
-
-            self._visualizer.resetPoints()
-            self._visualizer.resetSuperq()
-            self._visualizer.resetPoses()
-
-        # ------ Set Superquadric Model parameters ------ #
-        self._sq_estimator.SetNumericValue("tol", cfg.sq_model['tol'])
-        self._sq_estimator.SetIntegerValue("print_level", 0)
         if self._object_name is not None and self._object_name in cfg.objects.keys():
             self._sq_estimator.SetStringValue("object_class", cfg.objects[self._object_name])
         else:
             self._sq_estimator.SetStringValue("object_class", cfg.sq_model['object_class'])
-        self._sq_estimator.SetIntegerValue("optimizer_points", cfg.sq_model['optimizer_points'])
-        self._sq_estimator.SetBoolValue("random_sampling", cfg.sq_model['random_sampling'])
-
-        # ------ Set Superquadric Grasp parameters ------ #
-        self._grasp_estimator.SetIntegerValue("print_level", 0)
-        self._grasp_estimator.SetNumericValue("tol", cfg.sq_grasp[self._robot_name]['tol'])
-        self._grasp_estimator.SetIntegerValue("max_superq", cfg.sq_grasp[self._robot_name]['max_superq'])
-        self._grasp_estimator.SetNumericValue("constr_tol", cfg.sq_grasp[self._robot_name]['constr_tol'])
-        self._grasp_estimator.SetStringValue("left_or_right", "right" if self._grasping_hand is 'r' else "left")
-        self._grasp_estimator.setVector("plane", np.array(cfg.sq_grasp[self._robot_name]['plane_table']))
-        self._grasp_estimator.setVector("displacement", np.array(cfg.sq_grasp[self._robot_name]['displacement']))
-        self._grasp_estimator.setVector("hand", np.array(cfg.sq_grasp[self._robot_name]['hand_sq']))
-        self._grasp_estimator.setMatrix("bounds_right", np.array(cfg.sq_grasp[self._robot_name]['bounds_right']))
-        self._grasp_estimator.setMatrix("bounds_left", np.array(cfg.sq_grasp[self._robot_name]['bounds_left']))
 
         return
 
