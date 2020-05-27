@@ -22,6 +22,7 @@ class PandaGraspResidualGymEnv(gym.Env):
                 'video.frames_per_second': 50}
 
     def __init__(self,
+                 log_file=currentdir,
                  action_repeat=60,
                  control_orientation=1,
                  control_eu_or_quat=0,
@@ -508,12 +509,12 @@ class PandaGraspResidualGymEnv(gym.Env):
                 if self._renders:
                     time.sleep(self._time_step)
 
-                # w_obs, _ = self._world.get_observation()
+                w_obs, _ = self._world.get_observation()
                 # r_obs, _ = self._robot.get_observation()
                 # self._cum_reward += self._compute_reward(w_obs, r_obs, action)
 
-                # if self._termination(w_obs):
-                #     terminate = True
+                if self._termination(w_obs):
+                    terminate = True
 
             # set step counter to max in order to force end of episode
             self._env_step_counter = self._max_steps+1
@@ -627,7 +628,6 @@ class PandaGraspResidualGymEnv(gym.Env):
         # --- object lifted? --- #
         # ---------------------- #
         if self._object_lifted(w_obs[2], self._target_h_lift) and self.last_approach_step:
-            print("SUCCESS")
             return np.float32(1.)
         else:
             return np.float32(0.)

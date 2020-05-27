@@ -396,7 +396,8 @@ class SuperqGraspPlanner:
                                computeForwardKinematics=1, physicsClientId=self._traj_client_id)
         err_traj = 0.01
         count = 0
-        while goal_distance(np.array(state[0]), np.array(grasp_pose[:3])) >= err_traj and count <= 5e3:
+        max_iter = 5e3
+        while goal_distance(np.array(state[0]), np.array(grasp_pose[:3])) >= err_traj and count <= max_iter:
             self._robot.apply_action(grasp_pose, max_vel=0.5)
             p.stepSimulation(self._traj_client_id)
             state = p.getLinkState(self._robot.robot_id, self._robot.end_eff_idx, physicsClientId=self._traj_client_id)
@@ -411,7 +412,7 @@ class SuperqGraspPlanner:
 
             count += 1
 
-        if count > 10e3 and len(self._approach_path) < self._n_control_pt:
+        if count > max_iter and len(self._approach_path) < self._n_control_pt:
             return False
 
         self._approach_path.append((grasp_pose[:3], grasp_pose[3:7]))

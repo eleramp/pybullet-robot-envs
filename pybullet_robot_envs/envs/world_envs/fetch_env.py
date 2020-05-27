@@ -151,7 +151,7 @@ class WorldFetchEnv:
             py = py + noise[1]
 
             # Add uniform noise to yaw orientation
-            quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=-m.pi, high=m.pi)])
+            quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=-m.pi/4, high=m.pi/4)])
 
         px = np.clip(px, x_min, x_max)
         py = np.clip(py, y_min, y_max)

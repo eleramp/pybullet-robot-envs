@@ -225,6 +225,7 @@ class iCubHandsEnv(iCubEnv):
                                         targetPositions=self._grasp_pos,
                                         positionGains=[0.1] * len(idx_fingers),
                                         velocityGains=[1.0] * len(idx_fingers),
+                                        forces=[10] * len(idx_fingers),
                                         physicsClientId=self._physics_client_id)
 
         else:

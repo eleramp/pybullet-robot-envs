@@ -34,7 +34,7 @@ class pandaEnv:
         self._include_vel_obs = includeVelObs
         self._control_eu_or_quat = control_eu_or_quat
 
-        self._workspace_lim = [[0.25, 0.65], [-0.3, 0.3], [0.67, 1.5]]
+        self._workspace_lim = [[0.3, 0.65], [-0.3, 0.3], [0.67, 1.5]]
         self._eu_lim = [[-m.pi, m.pi], [-m.pi, m.pi], [-m.pi, m.pi]]
 
         self.end_eff_idx = 11  # 8
@@ -195,10 +195,10 @@ class pandaEnv:
         return observation, observation_lim
 
     def pre_grasp(self):
-        self.apply_action_fingers((0.04, 0.04))
+        self.apply_action_fingers([0.04, 0.04])
 
     def grasp(self, obj_id):
-        self.apply_action_fingers((0.0, 0.0), obj_id)
+        self.apply_action_fingers([0.0, 0.0], obj_id)
 
     def apply_action_fingers(self, action, obj_id=None):
         # move finger joints in position control
@@ -209,12 +209,12 @@ class pandaEnv:
         # use object id to check contact force and eventually stop the finger motion
         if obj_id is not None:
             _, forces = self.check_contact_fingertips(obj_id)
-            print("contact forces {}".format(forces))
+            # print("contact forces {}".format(forces))
 
-            if forces[0] >= 15.0:
+            if forces[0] >= 20.0:
                 action[0] = p.getJointState(self.robot_id, idx_fingers[0], physicsClientId=self._physics_client_id)[0]
 
-            if forces[1] >= 15.0:
+            if forces[1] >= 20.0:
                 action[1] = p.getJointState(self.robot_id, idx_fingers[1], physicsClientId=self._physics_client_id)[0]
 
         for i, idx in enumerate(idx_fingers):

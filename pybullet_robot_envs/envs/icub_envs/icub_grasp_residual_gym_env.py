@@ -236,7 +236,7 @@ class iCubGraspResidualGymEnv(gym.Env):
         self._target_h_lift = world_obs[2] + 0.15
 
         self._t_grasp, self._t_lift = 0, 0
-        self._grasping_step = 300
+        self._grasping_step = 100
         self.last_approach_step = False
 
         # Define spaces if not done already
@@ -484,7 +484,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
             w_obs, _ = self._world.get_observation()
             if self._termination(w_obs):
-                break
+                terminate = True
 
         # --- if it is the last step, try to grasp and lift the object --- #
 
@@ -507,7 +507,7 @@ class iCubGraspResidualGymEnv(gym.Env):
 
                 avg_forces = np.mean(ct_forces[-10:], axis=0)
 
-                f_big = [f for f in avg_forces if f >= 15.]
+                f_big = [f for f in avg_forces if f >= 20.]
 
                 if len(f_big) >= 3:
                     self._grasping_step = 0
@@ -525,6 +525,10 @@ class iCubGraspResidualGymEnv(gym.Env):
                 p.stepSimulation(physicsClientId=self._physics_client_id)
                 if self._renders:
                     time.sleep(self._time_step)
+
+                w_obs, _ = self._world.get_observation()
+                if self._termination(w_obs):
+                    terminate = True
 
             self._env_step_counter = self._max_steps + 1
 
@@ -634,7 +638,6 @@ class iCubGraspResidualGymEnv(gym.Env):
 
     def _is_success(self, w_obs):
         if self._object_lifted(w_obs[2], self._target_h_lift) and self.last_approach_step:
-            print("SUCCESS")
             return np.float32(1.)
         else:
             return np.float32(0.)
