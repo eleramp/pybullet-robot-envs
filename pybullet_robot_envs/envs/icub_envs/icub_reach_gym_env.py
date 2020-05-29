@@ -10,7 +10,7 @@ import quaternion
 
 from pybullet_robot_envs.envs.icub_envs.icub_env_with_hands import iCubHandsEnv
 from pybullet_robot_envs.envs.icub_envs.icub_env import iCubEnv
-from pybullet_robot_envs.envs.world_envs.ycb_fetch_env import get_ycb_objects_list, YcbWorldFetchEnv
+from pybullet_robot_envs.envs.world_envs.world_env import get_ycb_objects_list, YcbWorldEnv
 from pybullet_robot_envs.envs.icub_envs.superq_grasp_planner import SuperqGraspPlanner
 from pybullet_robot_envs.envs.utils import goal_distance, axis_angle_to_quaternion
 
@@ -77,7 +77,7 @@ class iCubReachGymEnv(gym.Env):
                                    control_eu_or_quat=self._control_eu_or_quat)
 
         # Load world environment
-        self._world = YcbWorldFetchEnv(self._physics_client_id,
+        self._world = YcbWorldEnv(self._physics_client_id,
                                        obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                        workspace_lim=self._robot._workspace_lim,
                                        control_eu_or_quat=self._control_eu_or_quat)

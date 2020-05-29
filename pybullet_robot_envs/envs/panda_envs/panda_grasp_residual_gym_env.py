@@ -9,7 +9,7 @@ import math as m
 import quaternion
 
 from pybullet_robot_envs.envs.panda_envs.panda_env import pandaEnv
-from pybullet_robot_envs.envs.world_envs.ycb_fetch_env import get_ycb_objects_list, YcbWorldFetchEnv
+from pybullet_robot_envs.envs.world_envs.world_env import get_ycb_objects_list, YcbWorldEnv
 from pybullet_robot_envs.envs.panda_envs.superq_grasp_planner import SuperqGraspPlanner
 from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication, axis_angle_to_quaternion, scale_gym_data
 
@@ -89,7 +89,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         else:
             obj_name = self._obj_name
 
-        self._world = YcbWorldFetchEnv(self._physics_client_id,
+        self._world = YcbWorldEnv(self._physics_client_id,
                                        obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                        workspace_lim=self._robot.get_workspace(),
                                        control_eu_or_quat=self._control_eu_or_quat)

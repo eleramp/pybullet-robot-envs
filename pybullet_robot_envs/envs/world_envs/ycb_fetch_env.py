@@ -1,12 +1,14 @@
+# Copyright (C) 2019 Istituto Italiano di Tecnologia (IIT)
+# This software may be modified and distributed under the terms of the
+# LGPL-2.1+ license. See the accompanying LICENSE file for details.
+
 import os, inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
 
 import pybullet as p
-import pybullet_data
 
-
-from pybullet_robot_envs.envs.world_envs.fetch_env import WorldFetchEnv
+from pybullet_robot_envs.envs.world_envs.world_env import WorldEnv
 from pybullet_object_models import ycb_objects
 
 
@@ -33,7 +35,7 @@ def get_ycb_objects_list():
     return obj_list
 
 
-class YcbWorldFetchEnv(WorldFetchEnv):
+class YcbWorldFetchEnv(WorldEnv):
 
     def __init__(self,
                  physicsClientId,
@@ -42,39 +44,11 @@ class YcbWorldFetchEnv(WorldFetchEnv):
                  workspace_lim=None,
                  control_eu_or_quat=0):
 
-        if workspace_lim is None:
-            workspace_lim = [[0.25, 0.52], [-0.3, 0.3], [0.5, 1.0]]
+        super(WorldEnv, self).__init__(physicsClientId, obj_name, obj_pose_rnd_std, workspace_lim, control_eu_or_quat)
 
-        self._physics_client_id = physicsClientId
-        self._ws_lim = tuple(workspace_lim)
-        self._h_table = []
-        self._obj_name = obj_name
-        self._obj_pose_rnd_std = obj_pose_rnd_std
-        self._obj_init_pose = []
-
-        self.obj_id = None
-        self.table_id = None
-
-        self._control_eu_or_quat = control_eu_or_quat
-
-        # initialize
-        self.seed()
-        self.reset()
-
-    def reset(self):
-        p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
-
-        # Load table and object
-        self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"), [0.85, 0.0, 0.0], physicsClientId=self._physics_client_id)
-
-        table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
-        self._h_table = table_info[5][2] + table_info[3][2]/2
-
-        # set ws limit on z according to table height
-        self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
-
+    def load_object(self, obj_name):
         # Load object. Randomize its start position if requested
         self._obj_init_pose = self._sample_pose()
-        self.obj_id = p.loadURDF(os.path.join(ycb_objects.getDataPath(), self._obj_name,  "model.urdf"),
+        self.obj_id = p.loadURDF(os.path.join(ycb_objects.getDataPath(), obj_name, "model.urdf"),
                                  basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
                                  physicsClientId=self._physics_client_id)

@@ -13,9 +13,7 @@ from gym.utils import seeding
 
 import pybullet as p
 from pybullet_robot_envs.envs.panda_envs.panda_env import pandaEnv
-from pybullet_robot_envs.envs.world_envs.fetch_env import get_objects_list, WorldFetchEnv
-
-from pkg_resources import parse_version
+from pybullet_robot_envs.envs.world_envs.world_env import get_objects_list, WorldEnv
 
 from pybullet_robot_envs.envs.utils import goal_distance
 
@@ -75,7 +73,7 @@ class pandaPushGymEnv(gym.Env):
         self._robot = pandaEnv(self._physics_client_id, use_IK=1)
 
         # Load world environment
-        self._world = WorldFetchEnv(self._physics_client_id,
+        self._world = WorldEnv(self._physics_client_id,
                                     obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                     workspace_lim=self._robot._workspace_lim)
 
@@ -103,10 +101,10 @@ class pandaPushGymEnv(gym.Env):
         observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
 
         # Configure action space
-        self.action_dim = self._robot.get_action_dimension()
+        self.action_dim = self._robot.get_action_dim()
 
         if self._discrete_action:
-            self.action_space = spaces.Discrete(self.action_dim)
+            action_space = spaces.Discrete(self.action_dim)
         else:
             action_bound = 0.05
             action_high = np.array([action_bound] * self.action_dim)

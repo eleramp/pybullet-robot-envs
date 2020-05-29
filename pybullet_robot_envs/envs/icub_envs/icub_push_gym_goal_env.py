@@ -16,7 +16,7 @@ import pybullet as p
 
 from pybullet_robot_envs.envs.icub_envs.icub_env import iCubEnv
 from pybullet_robot_envs.envs.icub_envs.icub_push_gym_env import iCubPushGymEnv
-from pybullet_robot_envs.envs.world_envs.fetch_env import get_objects_list, WorldFetchEnv
+from pybullet_robot_envs.envs.world_envs.world_env import get_objects_list, WorldEnv
 
 from pybullet_robot_envs.envs.utils import goal_distance
 
@@ -78,7 +78,7 @@ class iCubPushGymGoalEnv(gym.GoalEnv, iCubPushGymEnv):
                               control_orientation=self._control_orientation)
 
         # Load world environment
-        self._world = WorldFetchEnv(self._physics_client_id,
+        self._world = WorldEnv(self._physics_client_id,
                                     obj_name=obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
                                     workspace_lim=self._robot._workspace_lim)
 

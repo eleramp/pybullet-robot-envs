@@ -1,3 +1,7 @@
+# Copyright (C) 2019 Istituto Italiano di Tecnologia (IIT)
+# This software may be modified and distributed under the terms of the
+# LGPL-2.1+ license. See the accompanying LICENSE file for details.
+
 import os, inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
@@ -5,22 +9,28 @@ os.sys.path.insert(0, currentdir)
 import numpy as np
 import math as m
 import pybullet as p
-import pybullet_data
 from gym.utils import seeding
+
+import pybullet_data
+from pybullet_object_models import ycb_objects, superquadric_objects
 
 
 def get_objects_list():
-    obj_list = [
-        'duck_vhacd',
-        'cube_small',
-        'teddy_vhacd',
-        'domino/domino',
-    ]
-
+    obj_list = [dir for dir in os.listdir(pybullet_data.getDataPath()) if not dir.startswith('__')]
     return obj_list
 
-# # #
-class WorldFetchEnv:
+
+def get_ycb_objects_list():
+    obj_list = [dir for dir in os.listdir(ycb_objects.getDataPath()) if not dir.startswith('__')]
+    return obj_list
+
+
+def get_sq_objects_list():
+    obj_list = [dir for dir in os.listdir(superquadric_objects.getDataPath()) if not dir.startswith('__')]
+    return obj_list
+
+
+class WorldEnv:
 
     def __init__(self,
                  physicsClientId,
@@ -61,10 +71,15 @@ class WorldFetchEnv:
         # set ws limit on z according to table height
         self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
 
+        self.load_object(self._obj_name)
+
+    def load_object(self, obj_name):
+
         # Load object. Randomize its start position if requested
+        self._obj_name = obj_name
         self._obj_init_pose = self._sample_pose()
-        self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), self._obj_name + ".urdf"),
-                                basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
+        self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), obj_name + ".urdf"),
+                                 basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
                                  flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
                                  physicsClientId=self._physics_client_id)
 
@@ -72,6 +87,9 @@ class WorldFetchEnv:
         pos = self._obj_init_pose[:3]
         quat = self._obj_init_pose[3:7]
         return pos, quat
+
+    def set_obj_pose(self, new_pos, new_quat):
+        p.resetBasePositionAndOrientation(self.obj_id, new_pos, new_quat, physicsClientId=self._physics_client_id)
 
     def get_table_height(self):
         return self._h_table
@@ -106,9 +124,6 @@ class WorldFetchEnv:
             observation_lim.extend([[-1, 1], [-1, 1], [-1, 1], [-1, 1]])
 
         return observation, observation_lim
-
-    def set_obj_pose(self, new_pos, new_quat):
-        p.resetBasePositionAndOrientation(self.obj_id, new_pos, new_quat, physicsClientId=self._physics_client_id)
 
     def check_contact(self, body_id, obj_id=None):
         if obj_id is None:
@@ -159,3 +174,43 @@ class WorldFetchEnv:
         obj_pose = (px, py, pz) + quat
 
         return obj_pose
+
+
+class YcbWorldEnv(WorldEnv):
+
+    def __init__(self,
+                 physicsClientId,
+                 obj_name='YcbMustardBottle',
+                 obj_pose_rnd_std=0.05,
+                 workspace_lim=None,
+                 control_eu_or_quat=0):
+        super(YcbWorldEnv, self).__init__(physicsClientId, obj_name, obj_pose_rnd_std, workspace_lim,
+                                       control_eu_or_quat)
+
+    def load_object(self, obj_name):
+        # Load object. Randomize its start position if requested
+        self._obj_name = obj_name
+        self._obj_init_pose = self._sample_pose()
+        self.obj_id = p.loadURDF(os.path.join(ycb_objects.getDataPath(), obj_name, "model.urdf"),
+                                 basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
+                                 physicsClientId=self._physics_client_id)
+
+
+class SqWorldEnv(WorldEnv):
+
+    def __init__(self,
+                 physicsClientId,
+                 obj_name='YcbMustardBottle',
+                 obj_pose_rnd_std=0.05,
+                 workspace_lim=None,
+                 control_eu_or_quat=0):
+        super(SqWorldEnv, self).__init__(physicsClientId, obj_name, obj_pose_rnd_std, workspace_lim,
+                                       control_eu_or_quat)
+
+    def load_object(self, obj_name):
+        # Load object. Randomize its start position if requested
+        self._obj_name = obj_name
+        self._obj_init_pose = self._sample_pose()
+        self.obj_id = p.loadURDF(os.path.join(superquadric_objects.getDataPath(), obj_name, "model.urdf"),
+                                 basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
+                                 physicsClientId=self._physics_client_id)
