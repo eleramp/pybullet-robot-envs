@@ -129,7 +129,7 @@ class SuperqGraspPlanner:
 
         # --- compute point cloud of the object --- #
         obj_points, obj_colors = self.inHandCam.calc_point_cloud(self._robot.robot_id, self._physics_client_id, 30, 30,
-                                                         with_noise=True, obj_id=self._obj_id)
+                                                         with_noise=False, obj_id=self._obj_id)
 
         # --- transform points from cam frame to world frame --- #
 
@@ -159,8 +159,9 @@ class SuperqGraspPlanner:
             bindings_colors.push_back(col.tolist())
 
             # if i % 100 is 0:
-            #     p.addUserDebugLine(v3, [v3[0] + 0.001, v3[1], v3[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
-            #                       lifeTime=300, parentObjectUniqueId=self._robot.robot_id, physicsClientId=self._physics_client_id)
+            #     w_py_pt = w_py_T_cam.dot(np.append(pt, 1))
+            #     p.addUserDebugLine(w_py_pt[:3], [w_py_pt[0] + 0.005, w_py_pt[1], w_py_pt[2]], lineColorRGB=[0, 1, 0], lineWidth=4.0,
+            #                       lifeTime=300, physicsClientId=self._physics_client_id)
 
         if bindings_points.size() >= cfg.sq_model['minimum_points']:
             self._pointcloud.setPoints(bindings_points)

@@ -49,7 +49,7 @@ class iCubEnv:
                               'r_elbow', 'r_wrist_pitch', 'r_wrist_prosup', 'r_wrist_yaw'],
                     }
 
-    def __init__(self, physicsClientId, use_IK=0, control_arm='l', control_orientation=0, control_eu_or_quat=0):
+    def __init__(self, physicsClientId, use_IK=0, control_arm='l', control_orientation=1, control_eu_or_quat=0):
 
         self._physics_client_id = physicsClientId
         self._use_IK = use_IK
@@ -246,9 +246,9 @@ class iCubEnv:
 
     def _com_to_link_hand_frame(self):
         if self._control_arm is 'r':
-            com_T_link_hand = (0.064668, -0.0056, -0.022681)
+            com_T_link_hand = ((0.064668, -0.0056, -0.022681), (0., 0., 0., 1.))
         else:
-            com_T_link_hand = (-0.064768, -0.00563, -0.02266)
+            com_T_link_hand = ((-0.064768, -0.00563, -0.02266), (0., 0., 0., 1.))
 
         return com_T_link_hand
 
@@ -298,7 +298,7 @@ class iCubEnv:
             # transform the new pose from COM coordinate to link coordinate, because calculateInverseKinematics() wants the link coordinate
             com_T_link_hand = self._com_to_link_hand_frame()
 
-            link_hand_pose = p.multiplyTransforms(new_pos, new_quat_orn, com_T_link_hand, (0., 0., 0., 1.))
+            link_hand_pose = p.multiplyTransforms(new_pos, new_quat_orn, com_T_link_hand[0], com_T_link_hand[1])
 
             jointPoses = p.calculateInverseKinematics(self.robot_id, self.end_eff_idx,
                                                       link_hand_pose[0], link_hand_pose[1],

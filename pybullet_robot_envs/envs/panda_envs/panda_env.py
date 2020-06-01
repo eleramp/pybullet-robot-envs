@@ -22,19 +22,19 @@ class pandaEnv:
         'panda_joint7': 1.0, 'panda_finger_joint1': 0.02, 'panda_finger_joint2': 0.02,
     }
 
-    def __init__(self, physicsClientId, use_IK=0, base_position=(0.0, 0, 0.625), joint_action_space=7, includeVelObs=True,
-                 control_eu_or_quat=0):
+    def __init__(self, physicsClientId, use_IK=0, base_position=(0.0, 0, 0.625), control_orientation=1, control_eu_or_quat=0,
+                 joint_action_space=7, includeVelObs=True):
 
         self._physics_client_id = physicsClientId
         self._use_IK = use_IK
-        self._control_orientation = 1
+        self._control_orientation = control_orientation
         self._base_position = base_position
 
         self.joint_action_space = joint_action_space
         self._include_vel_obs = includeVelObs
         self._control_eu_or_quat = control_eu_or_quat
 
-        self._workspace_lim = [[0.3, 0.65], [-0.3, 0.3], [0.67, 1.5]]
+        self._workspace_lim = [[0.3, 0.65], [-0.3, 0.3], [0.65, 1.5]]
         self._eu_lim = [[-m.pi, m.pi], [-m.pi, m.pi], [-m.pi, m.pi]]
 
         self.end_eff_idx = 11  # 8
@@ -50,7 +50,7 @@ class pandaEnv:
 
     def reset(self):
         # Load robot model
-        flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_INERTIA_FROM_FILE
+        flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_INERTIA_FROM_FILE
         self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda_model.urdf"),
                                    basePosition=self._base_position, useFixedBase=True, flags=flags,
                                    physicsClientId=self._physics_client_id)
@@ -82,15 +82,13 @@ class pandaEnv:
 
         if self._use_IK:
 
-            self._home_hand_pose = [0.0, 0.0, 1.2,
+            self._home_hand_pose = [0.0, 0.0, 1.3,
                                     min(m.pi, max(-m.pi, m.pi)),
                                     min(m.pi, max(-m.pi, -m.pi/4)),
                                     min(m.pi, max(-m.pi, 0))]
 
             self.apply_action(self._home_hand_pose)
             p.stepSimulation(physicsClientId=self._physics_client_id)
-
-        self.debug_gui()
 
     def delete_simulated_robot(self):
         # Remove the robot from the simulation
@@ -197,7 +195,7 @@ class pandaEnv:
     def pre_grasp(self):
         self.apply_action_fingers([0.04, 0.04])
 
-    def grasp(self, obj_id):
+    def grasp(self, obj_id=None):
         self.apply_action_fingers([0.0, 0.0], obj_id)
 
     def apply_action_fingers(self, action, obj_id=None):

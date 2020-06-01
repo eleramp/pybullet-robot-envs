@@ -49,7 +49,7 @@ class iCubHandsEnv(iCubEnv):
 
     joint_groups.update(iCubEnv.joint_groups)
 
-    def __init__(self, physicsClientId, use_IK=0, control_arm='l', control_orientation=0, control_eu_or_quat=0):
+    def __init__(self, physicsClientId, use_IK=0, control_arm='l', control_orientation=1, control_eu_or_quat=0):
 
         self._physics_client_id = physicsClientId
         self._use_IK = use_IK
@@ -155,9 +155,9 @@ class iCubHandsEnv(iCubEnv):
 
     def _com_to_link_hand_frame(self):
         if self._control_arm is 'r':
-            com_T_link_hand = (-0.011682, 0.051682, -0.000577)
+            com_T_link_hand = ((-0.011682, 0.051682, -0.000577), (0.0, 0.0, 0.0, 1.0))
         else:
-            com_T_link_hand = (-0.011682, 0.051355, 0.000577)
+            com_T_link_hand = ((-0.011682, 0.051355, 0.000577), (0.0, 0.0, 0.0, 1.0))
 
         return com_T_link_hand
 
@@ -198,7 +198,7 @@ class iCubHandsEnv(iCubEnv):
                                     velocityGains=[1.0] * len(idx_fingers),
                                     physicsClientId=self._physics_client_id)
 
-    def grasp(self):
+    def grasp(self, pos=None):
         # close fingers
 
         if self._control_arm is 'l':
@@ -208,21 +208,23 @@ class iCubHandsEnv(iCubEnv):
             idx_thumb = self._joint_name_to_ids['r_hand::r_tj2']
             idx_fingers = [self._joint_name_to_ids[jn] for jn in self.joint_groups['r_hand']]
 
-        # set also position to other joints to avoid weird movements
-        not_idx_fingers = [idx for idx in self._joints_to_control if idx not in idx_fingers]
-
-        joint_states = p.getJointStates(self.robot_id, not_idx_fingers)
-        joint_poses = [x[0] for x in joint_states]
-        p.setJointMotorControlArray(self.robot_id, not_idx_fingers, p.POSITION_CONTROL,
-                                    targetPositions=joint_poses,
-                                    positionGains=[0.1] * len(not_idx_fingers),
-                                    velocityGains=[1.0] * len(not_idx_fingers),
-                                    physicsClientId=self._physics_client_id)
+        # # set also position to other joints to avoid weird movements
+        # not_idx_fingers = [idx for idx in self._joints_to_control if idx not in idx_fingers]
+        #
+        # joint_states = p.getJointStates(self.robot_id, not_idx_fingers)
+        # joint_poses = [x[0] for x in joint_states]
+        # p.setJointMotorControlArray(self.robot_id, not_idx_fingers, p.POSITION_CONTROL,
+        #                             targetPositions=joint_poses,
+        #                             positionGains=[0.1] * len(not_idx_fingers),
+        #                             velocityGains=[1.0] * len(not_idx_fingers),
+        #                             physicsClientId=self._physics_client_id)
 
         position_control = True
         if position_control:
+            if pos is None:
+                pos = self._grasp_pos
             p.setJointMotorControlArray(self.robot_id, idx_fingers, p.POSITION_CONTROL,
-                                        targetPositions=self._grasp_pos,
+                                        targetPositions=pos,
                                         positionGains=[0.1] * len(idx_fingers),
                                         velocityGains=[1.0] * len(idx_fingers),
                                         forces=[10] * len(idx_fingers),
@@ -234,8 +236,8 @@ class iCubHandsEnv(iCubEnv):
 
             p.setJointMotorControlArray(self.robot_id, idx_fingers, p.VELOCITY_CONTROL,
                                         targetVelocities=vel,
-                                        positionGains=[0.1] * len(not_idx_fingers),
-                                        velocityGains=[1.0] * len(not_idx_fingers),
+                                        positionGains=[0.1] * len(idx_fingers),
+                                        velocityGains=[1.0] * len(idx_fingers),
                                         physicsClientId=self._physics_client_id)
 
     def check_contact_fingertips(self, obj_id):
