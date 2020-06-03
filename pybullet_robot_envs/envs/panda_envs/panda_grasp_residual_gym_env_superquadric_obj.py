@@ -6,8 +6,9 @@ import numpy as np
 import time
 import pybullet as p
 import pickle
+import math as m
 
-import pybullet_object_models
+from pybullet_object_models import superquadric_objects
 
 from pybullet_robot_envs.envs.panda_envs.panda_env import pandaEnv
 from pybullet_robot_envs.envs.world_envs.world_env import get_ycb_objects_list, SqWorldEnv
@@ -20,7 +21,7 @@ os.sys.path.insert(0, currentdir)
 
 def get_dataset_list(dset):
     try:
-        f = open(os.path.join(pybullet_object_models.getDataPath(), dset + '.pkl'), 'rb')
+        f = open(os.path.join(superquadric_objects.getDataPath(), dset + '.pkl'), 'rb')
         itemlist = pickle.load(f)
 
         return itemlist
@@ -40,7 +41,8 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
                  control_orientation=1,
                  control_eu_or_quat=0,
                  normalize_obs=True,
-                 obj_pose_rnd_std=0.05,
+                 obj_pose_rnd_std=0.0,
+                 obj_orn_rnd=0.05,
                  noise_pcl=0.00,
                  renders=False,
                  max_steps=500,
@@ -66,6 +68,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         self._target_h_lift = 1
 
         self._obj_pose_rnd_std = obj_pose_rnd_std
+        self._obj_orn_rnd = obj_orn_rnd
         self._noise_pcl = noise_pcl
 
         self._last_frame_time = 0
@@ -87,6 +90,9 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         # this client is used only to compute the trajectory to the grasp pose and sample some way-points
         self._traj_client_id = p.connect(p.DIRECT)
 
+        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
+        p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
+
         # Load robot
         self._robot = pandaEnv(self._physics_client_id, use_IK=1, control_eu_or_quat=self._control_eu_or_quat)
 
@@ -98,7 +104,8 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         self._obj_name = self._obj_list[self._obj_iterator]
 
         self._world = SqWorldEnv(self._physics_client_id,
-                                       obj_name=self._obj_name, obj_pose_rnd_std=obj_pose_rnd_std,
+                                       obj_name=self._obj_name,
+                                        obj_pose_rnd_std=obj_pose_rnd_std, obj_orientation_rnd=self._obj_orn_rnd,
                                        workspace_lim=self._robot.get_workspace(),
                                        control_eu_or_quat=self._control_eu_or_quat)
 
@@ -155,30 +162,13 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         return observation_space, action_space
 
     def reset(self):
-        # --- reset simulation --- #
-        p.resetSimulation(physicsClientId=self._physics_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
-        p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
-
-        p.resetSimulation(physicsClientId=self._traj_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._traj_client_id)
-        p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
+        p.removeAllUserDebugItems()
 
         self._env_step_counter = 0
-
-        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
-        p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
 
         # --- reset robot --- #
         self._robot.reset()
         self._robot_traj.reset()
-
-        # Let the world run for a bit
-        for _ in range(50):
-            p.stepSimulation(physicsClientId=self._physics_client_id)
-            p.stepSimulation(physicsClientId=self._traj_client_id)
-            if self._renders:
-                time.sleep(self._time_step)
 
         # configure gripper in pre-grasp mode
         self._robot.pre_grasp()
@@ -195,11 +185,11 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
 
         self._world.reset()
 
-        # Let the world run for a bit
-        for _ in range(600):
-            p.stepSimulation(physicsClientId=self._physics_client_id)
-            if self._renders:
-                time.sleep(self._time_step)
+        # # Let the world run for a bit
+        # for _ in range(600):
+        #     p.stepSimulation(physicsClientId=self._physics_client_id)
+        #     if self._renders:
+        #         time.sleep(self._time_step)
 
         # --- reset base controller --- #
         self._base_controller.reset(obj_id=self._world.obj_id,
@@ -215,13 +205,10 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         # move robot closer to the object, to reduce esploration space
         if ok:
             base_action, _ = self._base_controller.get_next_action()
-
-            for _ in range(self._action_repeat*3):
-                self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
-
-                p.stepSimulation(physicsClientId=self._physics_client_id)
-                if self._renders:
-                    time.sleep(self._time_step)
+            self._robot._use_simulation = False
+            self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
+            self._robot._use_simulation = True
+            p.stepSimulation(physicsClientId=self._physics_client_id)
 
         # --- draw some reference frames in the simulation for debugging --- #
         self._robot.debug_gui()
@@ -296,9 +283,31 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
 
         # --- visualize superquadric and grasp pose in VTK --- #
         if self._renders:
-            self._base_controller._visualizer.visualize()
+            self._base_controller._visualizer.render()
+
+        # --- Check if object shape/pose is valid --- #
+        w_obs, _ = self._world.get_observation()
+        w_ws = self._world.get_workspace()
+        if w_obs[0] < w_ws[0][0] or w_obs[0] > w_ws[0][1] or w_obs[1] < w_ws[1][0] or w_obs[1] > w_ws[1][1]:
+            print("object has fallen out of workspace")
+            self.reset()
+            return False
+        self._world.get_object_shape_info()
+        if sq_dim[0] > 0.04 and sq_dim[1] > 0.04:
+            print("the object shape is ungraspable with panda")
+            self.reset()
+            return False
 
         # --- Compute the trajectory to the grasp pose --- #
+        # first move the robot to a top-table configuration, to have better trajectory
+        self._robot._use_simulation = False
+        self._robot_traj._use_simulation = False
+        pose = (0.3, 0.0, 1.2, m.pi, -m.pi/4, 0)
+        self._robot.apply_action(pose)
+        self._robot_traj.apply_action(pose)
+        self._robot._use_simulation = True
+        self._robot_traj._use_simulation = True
+
         ok = self._base_controller.compute_approach_path()
         if not ok:
             print("can't compute the approach path")
@@ -480,7 +489,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
             it_step += 1
 
             self._robot.apply_action(final_action_pos.tolist() + final_action_quat.tolist())
-
+            self._robot.pre_grasp()
             p.stepSimulation(physicsClientId=self._physics_client_id)
             if self._renders:
                 time.sleep(self._time_step)
@@ -716,29 +725,6 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         reward = r1 + r2 + (c1 + c2 + c3)
 
         return reward
-
-    def _compute_superq_f_at_point(self, pt):
-        # compute the superquadric function in a point, to see if the point is on/inside the superquadric surface
-
-        # get superquadric params
-        sq_pos = [self._superqs[0].center[0][0], self._superqs[0].center[1][0], self._superqs[0].center[2][0]]
-        sq_quat = axis_angle_to_quaternion((self._superqs[0].axisangle[0][0], self._superqs[0].axisangle[1][0],
-                                            self._superqs[0].axisangle[2][0], self._superqs[0].axisangle[3][0]))
-
-        sq_dim = self._superqs[0].dim
-        sq_exp = self._superqs[0].exp
-
-        # relative superq position wrt hand c.o.m. frame
-        inv_sq_pos, inv_sq_orn = p.invertTransform(sq_pos, sq_quat)
-        pt_pos_in_sq, pt_orn_in_sq = p.multiplyTransforms(inv_sq_pos, inv_sq_orn,
-                                                          pt, p.getQuaternionFromEuler([0, 0, 0]))
-
-        tmp = (np.abs(pt_pos_in_sq[0] / sq_dim[0][0]) ** 2.0) ** (1 / sq_exp[1][0]) + \
-              (np.abs(pt_pos_in_sq[1] / sq_dim[1][0]) ** 2.0) ** (1 / sq_exp[1][0])
-
-        f_sq = tmp ** (sq_exp[1][0] / sq_exp[0][0]) + (np.abs(pt_pos_in_sq[2] / sq_dim[2][0]) ** 2.0) ** (1 / sq_exp[0][0])
-
-        return np.float32(f_sq)
 
     def _compute_distance_reward(self, dist, max_dist):
         w = - np.log(10e-5) / (max_dist ** 2)
