@@ -21,7 +21,24 @@ def get_objects_list():
 
 
 def get_ycb_objects_list():
-    obj_list = [dir for dir in os.listdir(ycb_objects.getDataPath()) if not dir.startswith('__')]
+    obj_list = [
+        'YcbMustardBottle',
+        'YcbTomatoSoupCan',
+        'YcbCrackerBox',
+        'YcbChipsCan',
+        'YcbBanana',
+        'YcbFoamBrick',
+        'YcbGelatinBox',
+        'YcbHammer',
+        'YcbMasterChefCan',
+        'YcbMediumClamp',
+        'YcbPear',
+        'YcbPottedMeatCan',
+        'YcbPowerDrill',
+        'YcbScissors',
+        'YcbStrawberry',
+        'YcbTennisBall',
+    ]
     return obj_list
 
 
@@ -35,7 +52,8 @@ class WorldEnv:
     def __init__(self,
                  physicsClientId,
                  obj_name='duck_vhacd',
-                 obj_pose_rnd_std=0.05,
+                 obj_pose_rnd_std=0.0,
+                 obj_orientation_rnd=0.0,
                  workspace_lim=None,
                  control_eu_or_quat=0):
 
@@ -46,11 +64,14 @@ class WorldEnv:
         self._ws_lim = tuple(workspace_lim)
         self._h_table = []
         self._obj_name = obj_name
+        self._prev_obj_name = None
         self._obj_pose_rnd_std = obj_pose_rnd_std
+        self._obj_orientation_rnd = obj_orientation_rnd
         self._obj_init_pose = []
 
         self.obj_id = None
         self.table_id = None
+        self._is_initialized = False
 
         self._control_eu_or_quat = control_eu_or_quat
 
@@ -59,29 +80,49 @@ class WorldEnv:
         self.reset()
 
     def reset(self):
-        p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
+        if not self._is_initialized:
+            self._is_initialized = True
+            p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
 
-        # Load table and object
-        self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
-                              basePosition=[0.85, 0.0, 0.0], useFixedBase=True, physicsClientId=self._physics_client_id)
+            # Load table and object
+            self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
+                                  basePosition=[0.85, 0.0, 0.0], useFixedBase=True, physicsClientId=self._physics_client_id)
 
-        table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
-        self._h_table = table_info[5][2] + table_info[3][2]/2
+            table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
+            self._h_table = table_info[5][2] + table_info[3][2]/2
 
-        # set ws limit on z according to table height
-        self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
+            # set ws limit on z according to table height
+            self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
+
 
         self.load_object(self._obj_name)
 
-    def load_object(self, obj_name):
+    def load_object(self, new_obj):
 
         # Load object. Randomize its start position if requested
-        self._obj_name = obj_name
-        self._obj_init_pose = self._sample_pose()
-        self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), obj_name + ".urdf"),
-                                 basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
-                                 flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
-                                 physicsClientId=self._physics_client_id)
+        if new_obj == self._prev_obj_name and self.obj_id is not None:
+            obj_pos = self._sample_pose()
+            p.resetBasePositionAndOrientation(self.obj_id,
+                                              obj_pos[:3], obj_pos[3:7],
+                                              physicsClientId=self._physics_client_id)
+        else:
+            self._prev_obj_name = new_obj
+            if self.obj_id is not None:
+                p.removeBody(self.obj_id, physicsClientId=self._physics_client_id)
+            self._obj_name = new_obj
+            obj_pos = self._sample_pose()
+            self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), new_obj + ".urdf"),
+                                     basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
+                                     flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
+                                     physicsClientId=self._physics_client_id)
+
+        # Run the simulation a bit to let the object stabilize its pose
+        for _ in range(600):
+            p.stepSimulation(physicsClientId=self._physics_client_id)
+
+        obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id, physicsClientId=self._physics_client_id)
+
+        self._obj_init_pose = obj_pos + obj_orn
 
     def get_object_init_pose(self):
         pos = self._obj_init_pose[:3]
@@ -98,6 +139,10 @@ class WorldEnv:
         info = list(p.getCollisionShapeData(self.obj_id, -1, physicsClientId=self._physics_client_id)[0])
         info[4] = p.getVisualShapeData(self.obj_id, -1, physicsClientId=self._physics_client_id)[0][4]
         return info
+
+    def get_obj_bbox(self):
+        bbox_min, bbox_max = p.getAABB(self.obj_id, physicsClientId=self._physics_client_id)
+        return bbox_min, bbox_max
 
     def get_workspace(self):
         return [i[:] for i in self._ws_lim]
@@ -149,7 +194,7 @@ class WorldEnv:
         y_min = self._ws_lim[1][0] + 0.05
         y_max = self._ws_lim[1][1] - 0.05
 
-        px = x_min + 0.5 * (x_max - x_min)
+        px = x_min + 0.6 * (x_max - x_min)
         py = y_min + 0.5 * (y_max - y_min)
         pz = self._h_table + 0.07
 
@@ -165,8 +210,12 @@ class WorldEnv:
             px = px + noise[0]
             py = py + noise[1]
 
+        if self._obj_orientation_rnd > 0:
+
             # Add uniform noise to yaw orientation
-            quat = p.getQuaternionFromEuler([0, 0, self.np_random.uniform(low=-m.pi/4, high=m.pi/4)])
+            quat = p.getQuaternionFromEuler([self.np_random.uniform(low=-m.pi/2, high=m.pi/2),
+                                             self.np_random.uniform(low=-m.pi/2, high=m.pi/2),
+                                             self.np_random.uniform(low=-m.pi/2, high=m.pi/2)])
 
         px = np.clip(px, x_min, x_max)
         py = np.clip(py, y_min, y_max)
@@ -182,35 +231,75 @@ class YcbWorldEnv(WorldEnv):
                  physicsClientId,
                  obj_name='YcbMustardBottle',
                  obj_pose_rnd_std=0.05,
+                 obj_orientation_rnd=0.0,
                  workspace_lim=None,
                  control_eu_or_quat=0):
-        super(YcbWorldEnv, self).__init__(physicsClientId, obj_name, obj_pose_rnd_std, workspace_lim,
+        super().__init__(physicsClientId, obj_name, obj_pose_rnd_std, obj_orientation_rnd, workspace_lim,
                                        control_eu_or_quat)
 
-    def load_object(self, obj_name):
+
+    def load_object(self, new_obj):
+
         # Load object. Randomize its start position if requested
-        self._obj_name = obj_name
-        self._obj_init_pose = self._sample_pose()
-        self.obj_id = p.loadURDF(os.path.join(ycb_objects.getDataPath(), obj_name, "model.urdf"),
-                                 basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
-                                 physicsClientId=self._physics_client_id)
+        if new_obj == self._prev_obj_name and self.obj_id is not None:
+            obj_pos = self._sample_pose()
+            p.resetBasePositionAndOrientation(self.obj_id,
+                                              obj_pos[:3], obj_pos[3:7],
+                                              physicsClientId=self._physics_client_id)
+        else:
+            self._prev_obj_name = new_obj
+            if self.obj_id is not None:
+                p.removeBody(self.obj_id, physicsClientId=self._physics_client_id)
+            self._obj_name = new_obj
+            obj_pos = self._sample_pose()
+            self.obj_id = p.loadURDF(os.path.join(ycb_objects.getDataPath(), new_obj, "model.urdf"),
+                                     basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
+                                     flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
+                                     physicsClientId=self._physics_client_id)
+
+        # Run the simulation a bit to let the object stabilize its pose
+        for _ in range(600):
+            p.stepSimulation(physicsClientId=self._physics_client_id)
+
+        obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id, physicsClientId=self._physics_client_id)
+
+        self._obj_init_pose = obj_pos + obj_orn
 
 
 class SqWorldEnv(WorldEnv):
 
     def __init__(self,
                  physicsClientId,
-                 obj_name='YcbMustardBottle',
+                 obj_name='sq_0.12_0.12_0.12_1_1',
                  obj_pose_rnd_std=0.05,
+                 obj_orientation_rnd=0.0,
                  workspace_lim=None,
                  control_eu_or_quat=0):
-        super(SqWorldEnv, self).__init__(physicsClientId, obj_name, obj_pose_rnd_std, workspace_lim,
+        super().__init__(physicsClientId, obj_name, obj_pose_rnd_std, obj_orientation_rnd, workspace_lim,
                                        control_eu_or_quat)
 
-    def load_object(self, obj_name):
+    def load_object(self, new_obj):
+
         # Load object. Randomize its start position if requested
-        self._obj_name = obj_name
-        self._obj_init_pose = self._sample_pose()
-        self.obj_id = p.loadURDF(os.path.join(superquadric_objects.getDataPath(), obj_name, "model.urdf"),
-                                 basePosition=self._obj_init_pose[:3], baseOrientation=self._obj_init_pose[3:7],
-                                 physicsClientId=self._physics_client_id)
+        if new_obj == self._prev_obj_name and self.obj_id is not None:
+            obj_pos = self._sample_pose()
+            p.resetBasePositionAndOrientation(self.obj_id,
+                                              obj_pos[:3], obj_pos[3:7],
+                                              physicsClientId=self._physics_client_id)
+        else:
+            self._prev_obj_name = new_obj
+            if self.obj_id is not None:
+                p.removeBody(self.obj_id, physicsClientId=self._physics_client_id)
+            self._obj_name = new_obj
+            obj_pos = self._sample_pose()
+            self.obj_id = p.loadURDF(os.path.join(superquadric_objects.getDataPath(), new_obj, "model.urdf"),
+                                     basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
+                                     physicsClientId=self._physics_client_id)
+
+        # Run the simulation a bit to let the object stabilize its pose
+        for _ in range(600):
+            p.stepSimulation(physicsClientId=self._physics_client_id)
+
+        obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id, physicsClientId=self._physics_client_id)
+
+        self._obj_init_pose = obj_pos + obj_orn

@@ -44,18 +44,23 @@ class pandaEnv:
         self._num_dof = 7
         self._joint_name_to_ids = {}
         self.robot_id = None
+        self._is_initialized = False
+        self._use_simulation = True
 
         self.seed()
         self.reset()
 
     def reset(self):
-        # Load robot model
-        flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_INERTIA_FROM_FILE
-        self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda_model.urdf"),
-                                   basePosition=self._base_position, useFixedBase=True, flags=flags,
-                                   physicsClientId=self._physics_client_id)
+        if not self._is_initialized:
+            self._is_initialized = True
+            # Load robot model
+            flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_INERTIA_FROM_FILE
+            self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda_model.urdf"),
+                                       basePosition=self._base_position, useFixedBase=True, flags=flags,
+                                       physicsClientId=self._physics_client_id)
 
-        assert self.robot_id is not None, "Failed to load the panda model"
+            assert self.robot_id is not None, "Failed to load the panda model"
+
 
         # reset joints to home position
         num_joints = p.getNumJoints(self.robot_id, physicsClientId=self._physics_client_id)
@@ -87,7 +92,9 @@ class pandaEnv:
                                     min(m.pi, max(-m.pi, -m.pi/4)),
                                     min(m.pi, max(-m.pi, 0))]
 
+            self._use_simulation = False
             self.apply_action(self._home_hand_pose)
+            self._use_simulation = True
             p.stepSimulation(physicsClientId=self._physics_client_id)
 
     def delete_simulated_robot(self):
@@ -270,24 +277,31 @@ class pandaEnv:
                                                       maxNumIterations=100,
                                                       residualThreshold=.001,
                                                       physicsClientId=self._physics_client_id)
+            if self._use_simulation:
+                # --- set joint control --- #
+                if max_vel == -1:
+                    p.setJointMotorControlArray(bodyUniqueId=self.robot_id,
+                                                jointIndices=self._joint_name_to_ids.values(),
+                                                controlMode=p.POSITION_CONTROL,
+                                                targetPositions=jointPoses,
+                                                positionGains=[0.2] * len(jointPoses),
+                                                velocityGains=[1.0] * len(jointPoses),
+                                                physicsClientId=self._physics_client_id)
 
-            # --- set joint control --- #
-            if max_vel == -1:
-                p.setJointMotorControlArray(bodyUniqueId=self.robot_id,
-                                            jointIndices=self._joint_name_to_ids.values(),
-                                            controlMode=p.POSITION_CONTROL,
-                                            targetPositions=jointPoses,
-                                            positionGains=[0.2] * len(jointPoses),
-                                            velocityGains=[1.0] * len(jointPoses),
-                                            physicsClientId=self._physics_client_id)
-
+                else:
+                    for i in range(self._num_dof):
+                        p.setJointMotorControl2(bodyUniqueId=self.robot_id,
+                                                jointIndex=i,
+                                                controlMode=p.POSITION_CONTROL,
+                                                targetPosition=jointPoses[i],
+                                                maxVelocity=max_vel,
+                                                physicsClientId=self._physics_client_id)
             else:
                 for i in range(self._num_dof):
-                    p.setJointMotorControl2(bodyUniqueId=self.robot_id,
-                                            jointIndex=i,
-                                            controlMode=p.POSITION_CONTROL,
+                    p.resetJointState(self.robot_id, i, jointPoses[i], physicsClientId=self._physics_client_id)
+                    p.setJointMotorControl2(self.robot_id, i, p.POSITION_CONTROL,
                                             targetPosition=jointPoses[i],
-                                            maxVelocity=max_vel,
+                                            positionGain=0.2, velocityGain=1.0,
                                             physicsClientId=self._physics_client_id)
 
         else:

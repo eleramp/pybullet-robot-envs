@@ -78,6 +78,9 @@ class PandaGraspResidualGymEnv(gym.Env):
         # this client is used only to compute the trajectory to the grasp pose and sample some way-points
         self._traj_client_id = p.connect(p.DIRECT)
 
+        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
+        p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
+
         # Load robot
         self._robot = pandaEnv(self._physics_client_id, use_IK=1, control_eu_or_quat=self._control_eu_or_quat)
 
@@ -147,30 +150,33 @@ class PandaGraspResidualGymEnv(gym.Env):
         return observation_space, action_space
 
     def reset(self):
-        # --- reset simulation --- #
-        p.resetSimulation(physicsClientId=self._physics_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
-        p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
 
-        p.resetSimulation(physicsClientId=self._traj_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._traj_client_id)
-        p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
+        p.removeAllUserDebugItems()
+        # # --- reset simulation --- #
+        # p.resetSimulation(physicsClientId=self._physics_client_id)
+        # p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
+        # p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
+        #
+        # p.resetSimulation(physicsClientId=self._traj_client_id)
+        # p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._traj_client_id)
+        # p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
+
+        # p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
+        # p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
 
         self._env_step_counter = 0
 
-        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
-        p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
 
         # --- reset robot --- #
         self._robot.reset()
         self._robot_traj.reset()
 
-        # Let the world run for a bit
-        for _ in range(50):
-            p.stepSimulation(physicsClientId=self._physics_client_id)
-            p.stepSimulation(physicsClientId=self._traj_client_id)
-            if self._renders:
-                time.sleep(self._time_step)
+        # # Let the world run for a bit
+        # for _ in range(50):
+        #     p.stepSimulation(physicsClientId=self._physics_client_id)
+        #     p.stepSimulation(physicsClientId=self._traj_client_id)
+        #     if self._renders:
+        #         time.sleep(self._time_step)
 
         # configure gripper in pre-grasp mode
         self._robot.pre_grasp()
@@ -200,22 +206,24 @@ class PandaGraspResidualGymEnv(gym.Env):
         # --- compute superquadric and grasp pose --- #
         ok = self.compute_grasp_pose()
 
-        # move robot closer to the object, to reduce esploration space
+        # move robot closer to the object, to reduce exploration space
         if ok:
             base_action, _ = self._base_controller.get_next_action()
 
-            for _ in range(self._action_repeat*3):
-                self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
-
-                p.stepSimulation(physicsClientId=self._physics_client_id)
-                if self._renders:
-                    time.sleep(self._time_step)
+            # for _ in range(self._action_repeat*3):
+            self._robot._use_simulation = False
+            self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
+            self._robot._use_simulation = True
+            p.stepSimulation(physicsClientId=self._physics_client_id)
+                # p.stepSimulation(physicsClientId=self._physics_client_id)
+                # if self._renders:
+                #     time.sleep(self._time_step)
 
         # --- draw some reference frames in the simulation for debugging --- #
-        self._robot.debug_gui()
-        self._world.debug_gui()
-        self.debug_gui()
-        p.stepSimulation(physicsClientId=self._physics_client_id)
+        # self._robot.debug_gui()
+        # self._world.debug_gui()
+        # self.debug_gui()
+        # p.stepSimulation(physicsClientId=self._physics_client_id)
 
         # ---  set target object height for a successful lift --- #
         world_obs, _ = self._world.get_observation()
@@ -487,7 +495,7 @@ class PandaGraspResidualGymEnv(gym.Env):
             # --> do grasp
             grasping_step = 10
             while grasping_step > 0:
-                self._robot.grasp(self._world.obj_id)
+                self._robot.grasp()
                 # move fingers
                 p.stepSimulation(physicsClientId=self._physics_client_id)
                 if self._renders:
