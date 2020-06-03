@@ -9,7 +9,7 @@ parentdir = os.path.dirname(os.path.dirname(currentdir))
 os.sys.path.insert(0, parentdir)
 
 from pybullet_robot_envs.envs.panda_envs.panda_grasp_residual_gym_env import PandaGraspResidualGymEnv
-import pybullet_data
+from pybullet_robot_envs.envs.panda_envs.panda_grasp_residual_gym_env_superquadric_obj import PandaGraspResidualGymEnvSqObj
 
 
 import time
@@ -17,7 +17,7 @@ import math as m
 
 def main():
 
-    env = PandaGraspResidualGymEnv(obj_pose_rnd_std=0.07, renders=True, obj_name=1, n_control_pt=2, control_eu_or_quat=1)
+    env = PandaGraspResidualGymEnvSqObj(obj_pose_rnd_std=0.07, renders=True, dset='train', n_control_pt=2, control_eu_or_quat=1)
     motorsIds = []
 
     dv = 0.05
@@ -40,7 +40,7 @@ def main():
         # for motorId in motorsIds:
         #     action.append(env._p.readUserDebugParameter(motorId))
 
-        action = env.action_space.sample()
+        action = env.action_space.sample() *0.0
         state, reward, done, _ = env.step(action)
         if done:
             env.reset()
