@@ -198,7 +198,8 @@ class WorldEnv:
         py = y_min + 0.5 * (y_max - y_min)
         pz = self._h_table + 0.07
 
-        quat = p.getQuaternionFromEuler([0.0, 0.0, 1/4*m.pi])
+        eu = [0.0, 0.0, 0.0]
+        quat = p.getQuaternionFromEuler(eu)
 
         if self._obj_pose_rnd_std > 0:
             # Add a Gaussian noise to position
@@ -213,9 +214,13 @@ class WorldEnv:
         if self._obj_orientation_rnd > 0:
 
             # Add uniform noise to yaw orientation
-            quat = p.getQuaternionFromEuler([self.np_random.uniform(low=-m.pi/2, high=m.pi/2),
-                                             self.np_random.uniform(low=-m.pi/2, high=m.pi/2),
-                                             self.np_random.uniform(low=-m.pi/2, high=m.pi/2)])
+            idx = self.np_random.randint(0, 2)
+            eu[idx] = self.np_random.uniform(low=-m.pi/2, high=m.pi/2)
+            quat = p.getQuaternionFromEuler(eu)
+
+            # quat = p.getQuaternionFromEuler([self.np_random.uniform(low=-m.pi/2, high=m.pi/2),
+            #                                  self.np_random.uniform(low=-m.pi/2, high=m.pi/2),
+            #                                  self.np_random.uniform(low=-m.pi/2, high=m.pi/2)])
 
         px = np.clip(px, x_min, x_max)
         py = np.clip(py, y_min, y_max)

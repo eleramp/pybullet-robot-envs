@@ -17,7 +17,7 @@ import math as m
 
 def main():
 
-    env = PandaGraspResidualGymEnvSqObj(obj_pose_rnd_std=0.07, renders=True, dset='train', n_control_pt=2, control_eu_or_quat=1)
+    env = PandaGraspResidualGymEnvSqObj(obj_pose_rnd_std=0.0, obj_orn_rnd=1, renders=True, dset='train', n_control_pt=2, control_eu_or_quat=1)
     motorsIds = []
 
     dv = 0.05

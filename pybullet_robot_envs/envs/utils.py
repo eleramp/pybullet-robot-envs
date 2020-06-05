@@ -45,6 +45,20 @@ def quat_multiplication(a: np.ndarray, b: np.ndarray):
     return np.array([x12, y12, z12, w12])
 
 
+def quat_conjugate(a: np.ndarray):
+    return np.array([-a[0], -a[1], -a[2], a[3]])
+
+
+def quat_inverse(a: np.ndarray):
+    conj = quat_conjugate(a)
+    norm_a = np.linalg.norm(a)
+    inv = np.divide(conj, np.linalg.norm(a)**norm_a)
+    if not np.linalg.norm(inv) == 1.0:
+        warnings.warn("quat_inverse(): computed vector has not unitary norm {}".format(np.linalg.norm(a)))
+
+    return inv
+
+
 def axis_angle_to_quaternion(vec_aa: tuple):
     qx = vec_aa[0] * m.sin(vec_aa[3] / 2)
     qy = vec_aa[1] * m.sin(vec_aa[3] / 2)

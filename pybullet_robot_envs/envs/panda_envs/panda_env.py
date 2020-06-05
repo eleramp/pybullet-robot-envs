@@ -312,9 +312,11 @@ class pandaEnv:
             assert len(action) == self.joint_action_space, ('number of motor commands differs from number of motor to control', len(action))
 
             for a in range(len(action)):
-                curr_motor_pos = p.getJointState(self.robot_id, a, physicsClientId=self._physics_client_id)[0]
-                new_motor_pos = curr_motor_pos + action[a]  # supposed to be a delta
+                new_motor_pos = action[a]  # supposed to be a delta
                 new_motor_pos = min(self.ul[a], max(self.ll[a], new_motor_pos))
+
+                if not self._use_simulation:
+                    p.resetJointState(self.robot_id, a, new_motor_pos, physicsClientId=self._physics_client_id)
 
                 p.setJointMotorControl2(self.robot_id,
                                         a,

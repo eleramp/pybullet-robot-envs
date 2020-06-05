@@ -13,7 +13,7 @@ from pybullet_object_models import superquadric_objects
 from pybullet_robot_envs.envs.panda_envs.panda_env import pandaEnv
 from pybullet_robot_envs.envs.world_envs.world_env import get_ycb_objects_list, SqWorldEnv
 from pybullet_robot_envs.envs.panda_envs.superq_grasp_planner import SuperqGraspPlanner
-from pybullet_robot_envs.envs.utils import goal_distance, quat_multiplication, axis_angle_to_quaternion, scale_gym_data
+from pybullet_robot_envs.envs.utils import *
 
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 os.sys.path.insert(0, currentdir)
@@ -23,7 +23,7 @@ def get_dataset_list(dset):
     try:
         f = open(os.path.join(superquadric_objects.getDataPath(), dset + '.pkl'), 'rb')
         itemlist = pickle.load(f)
-
+        itemlist = itemlist[83:]
         return itemlist
 
     except Exception:
@@ -42,7 +42,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
                  control_eu_or_quat=0,
                  normalize_obs=True,
                  obj_pose_rnd_std=0.0,
-                 obj_orn_rnd=0.05,
+                 obj_orn_rnd=0.0,
                  noise_pcl=0.00,
                  renders=False,
                  max_steps=500,
@@ -181,7 +181,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
             self._obj_iterator = 0
 
         self._world._obj_name = obj_name
-        print("obj_name {}".format(obj_name))
+        print("it {} - obj_name {}".format(self._obj_iterator, obj_name))
 
         self._world.reset()
 
@@ -205,9 +205,12 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         # move robot closer to the object, to reduce esploration space
         if ok:
             base_action, _ = self._base_controller.get_next_action()
+            base_joint_conf = self._base_controller._approach_joint_path.pop()
             self._robot._use_simulation = False
-            self._robot.apply_action(base_action[0].tolist() + base_action[1].tolist())
+            self._robot._use_IK = 0
+            self._robot.apply_action(base_joint_conf[:self._robot.get_action_dim()])
             self._robot._use_simulation = True
+            self._robot._use_IK = 1
             p.stepSimulation(physicsClientId=self._physics_client_id)
 
         # --- draw some reference frames in the simulation for debugging --- #
@@ -292,8 +295,8 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
             print("object has fallen out of workspace")
             self.reset()
             return False
-        self._world.get_object_shape_info()
-        if sq_dim[0] > 0.04 and sq_dim[1] > 0.04:
+        print("visual dim {}".format(self._world.get_object_shape_info()[3]))
+        if sq_dim[0] > 0.05 and sq_dim[1] > 0.05:
             print("the object shape is ungraspable with panda")
             self.reset()
             return False
@@ -621,10 +624,17 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         # -------------------- #
         if self._control_eu_or_quat is 1:
             eu = p.getEulerFromQuaternion(w_obs[3:7])
+            quat = w_obs[3:7]
         else:
             eu = w_obs[3:6]
+            quat = p.getQuaternionFromEuler(w_obs[3:6])
 
-        if self._object_fallen(eu[0], eu[1]):
+        init_obj_pos, init_obj_quat = self._world.get_object_init_pose()
+        rel_quat = quat_multiplication(quat_inverse(np.array(quat)), np.array(init_obj_quat))
+
+        rel_eu = p.getEulerFromQuaternion(rel_quat)
+
+        if self._object_fallen(rel_eu[0], rel_eu[1]):
             print("FALLEN")
             return np.float32(1.)
 
@@ -677,10 +687,17 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         # --------------------------- #
         if self._control_eu_or_quat is 1:
             eu = p.getEulerFromQuaternion(w_obs[3:7])
+            quat = w_obs[3:7]
         else:
             eu = w_obs[3:6]
+            quat = p.getQuaternionFromEuler(w_obs[3:6])
 
-        if self._object_fallen(eu[0], eu[1]):
+        init_obj_pos, init_obj_quat = self._world.get_object_init_pose()
+        rel_quat = quat_multiplication(quat_inverse(np.array(quat)), np.array(init_obj_quat))
+
+        rel_eu = p.getEulerFromQuaternion(rel_quat)
+
+        if self._object_fallen(rel_eu[0], rel_eu[1]):
             c2 = -np.float32(30.0)
 
         if not self.last_approach_step:

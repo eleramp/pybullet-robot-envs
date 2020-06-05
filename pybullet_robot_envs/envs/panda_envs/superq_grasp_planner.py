@@ -45,6 +45,7 @@ class SuperqGraspPlanner:
         self._starting_pose = []
         self._best_grasp_pose = []
         self._approach_path = []
+        self._approach_joint_path = []
         self._n_control_pt = 3
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
@@ -109,6 +110,7 @@ class SuperqGraspPlanner:
         # reset variables
         self._best_grasp_pose = []
         self._approach_path = []
+        self._approach_joint_path = []
         self._action = [np.zeros(3), np.array([0, 0, 0, 1]), np.zeros(1)]
         self._obj_info = []
 
@@ -128,8 +130,9 @@ class SuperqGraspPlanner:
     def compute_object_pointcloud(self, hand_pose):
 
         # --- compute point cloud of the object --- #
+        noise = self._noise_pcl > 0
         obj_points, obj_colors = self.inHandCam.calc_point_cloud(self._robot.robot_id, self._physics_client_id, 30, 30,
-                                                         with_noise=False, obj_id=self._obj_id)
+                                                         with_noise=noise, obj_id=self._obj_id)
 
         # --- transform points from cam frame to world frame --- #
 
@@ -386,6 +389,7 @@ class SuperqGraspPlanner:
 
         # reset current path
         self._approach_path = []
+        self._approach_joint_path = []
         grasp_pose = tuple(self._best_grasp_pose[:3]) + p.getQuaternionFromEuler(self._best_grasp_pose[3:6])
 
         dist_max = 0.15
@@ -405,6 +409,10 @@ class SuperqGraspPlanner:
             curr_dist = goal_distance(np.array(state[0]), np.array(grasp_pose[:3]))
             if curr_dist <= step_dist*n_via_points:
                 self._approach_path.append((state[0], state[1]))
+
+                joints_states = p.getJointStates(self._robot.robot_id, self._robot._joint_name_to_ids.values(), physicsClientId=self._traj_client_id)
+                self._approach_joint_path.append([x[0] for x in joints_states])
+
                 print("dist at point {} is {}".format(n_via_points, curr_dist))
                 n_via_points -= 1
 
@@ -419,6 +427,7 @@ class SuperqGraspPlanner:
         self._approach_path.append((grasp_pose[:3], grasp_pose[3:7]))
         self._debug_gui(self._approach_path)
         self._approach_path.reverse()
+        self._approach_joint_path.reverse()
         return True
 
     def is_last_approach_step(self):
@@ -433,7 +442,7 @@ class SuperqGraspPlanner:
 
         return False
 
-    def get_next_action(self, robot_obs=None, world_obs=None, atol=1e-2):
+    def get_next_action(self, atol=1e-2):
         """
         State machine that returnes the next action to apply to the robot's hand, based on the current state of the system
 
@@ -448,6 +457,7 @@ class SuperqGraspPlanner:
 
         # Approach the object
         if self._approach_path:
+
             # print("APPROACH")
             next_pose = self._approach_path.pop()
             self._action = [np.array(next_pose[0]), np.array(next_pose[1]), np.array([-1])]
