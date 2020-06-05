@@ -27,7 +27,7 @@ def get_dataset_list(dset):
         return itemlist
 
     except Exception:
-        print("Cannot load dataset file {}".format(os.path.join(pybullet_object_models.getDataPath(), dset + '.pkl')))
+        print("Cannot load dataset file {}".format(os.path.join(superquadric_objects.getDataPath(), dset + '.pkl')))
 
 
 class PandaGraspResidualGymEnvSqObj(gym.Env):
