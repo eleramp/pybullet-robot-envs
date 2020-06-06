@@ -23,7 +23,6 @@ def get_dataset_list(dset):
     try:
         f = open(os.path.join(superquadric_objects.getDataPath(), dset + '.pkl'), 'rb')
         itemlist = pickle.load(f)
-        itemlist = itemlist[83:]
         return itemlist
 
     except Exception:
