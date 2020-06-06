@@ -71,7 +71,6 @@ class WorldEnv:
 
         self.obj_id = None
         self.table_id = None
-        self._is_initialized = False
 
         self._control_eu_or_quat = control_eu_or_quat
 
@@ -80,44 +79,33 @@ class WorldEnv:
         self.reset()
 
     def reset(self):
-        if not self._is_initialized:
-            self._is_initialized = True
-            p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
 
-            # Load table and object
-            self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
-                                  basePosition=[0.85, 0.0, 0.0], useFixedBase=True, physicsClientId=self._physics_client_id)
+        p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
 
-            table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
-            self._h_table = table_info[5][2] + table_info[3][2]/2
+        # Load table and object
+        self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
+                              basePosition=[0.85, 0.0, 0.0], useFixedBase=True, physicsClientId=self._physics_client_id)
 
-            # set ws limit on z according to table height
-            self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
+        table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
+        self._h_table = table_info[5][2] + table_info[3][2]/2
+
+        # set ws limit on z according to table height
+        self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
 
 
         self.load_object(self._obj_name)
 
     def load_object(self, new_obj):
-
         # Load object. Randomize its start position if requested
-        if new_obj == self._prev_obj_name and self.obj_id is not None:
-            obj_pos = self._sample_pose()
-            p.resetBasePositionAndOrientation(self.obj_id,
-                                              obj_pos[:3], obj_pos[3:7],
-                                              physicsClientId=self._physics_client_id)
-        else:
-            self._prev_obj_name = new_obj
-            if self.obj_id is not None:
-                p.removeBody(self.obj_id, physicsClientId=self._physics_client_id)
-            self._obj_name = new_obj
-            obj_pos = self._sample_pose()
-            self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), new_obj + ".urdf"),
-                                     basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
-                                     flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
-                                     physicsClientId=self._physics_client_id)
+        self._obj_name = new_obj
+        obj_pos = self._sample_pose()
+        self.obj_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), new_obj + ".urdf"),
+                                 basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
+                                 flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
+                                 physicsClientId=self._physics_client_id)
 
         # Run the simulation a bit to let the object stabilize its pose
-        for _ in range(600):
+        for _ in range(50):
             p.stepSimulation(physicsClientId=self._physics_client_id)
 
         obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id, physicsClientId=self._physics_client_id)
@@ -194,7 +182,7 @@ class WorldEnv:
         y_min = self._ws_lim[1][0] + 0.05
         y_max = self._ws_lim[1][1] - 0.05
 
-        px = x_min + 0.6 * (x_max - x_min)
+        px = x_min + 0.7 * (x_max - x_min)
         py = y_min + 0.5 * (y_max - y_min)
         pz = self._h_table + 0.07
 
@@ -246,24 +234,15 @@ class YcbWorldEnv(WorldEnv):
     def load_object(self, new_obj):
 
         # Load object. Randomize its start position if requested
-        if new_obj == self._prev_obj_name and self.obj_id is not None:
-            obj_pos = self._sample_pose()
-            p.resetBasePositionAndOrientation(self.obj_id,
-                                              obj_pos[:3], obj_pos[3:7],
-                                              physicsClientId=self._physics_client_id)
-        else:
-            self._prev_obj_name = new_obj
-            if self.obj_id is not None:
-                p.removeBody(self.obj_id, physicsClientId=self._physics_client_id)
-            self._obj_name = new_obj
-            obj_pos = self._sample_pose()
-            self.obj_id = p.loadURDF(os.path.join(ycb_objects.getDataPath(), new_obj, "model.urdf"),
-                                     basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
-                                     flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
-                                     physicsClientId=self._physics_client_id)
+        self._obj_name = new_obj
+        obj_pos = self._sample_pose()
+        self.obj_id = p.loadURDF(os.path.join(ycb_objects.getDataPath(), new_obj, "model.urdf"),
+                                 basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
+                                 flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL,
+                                 physicsClientId=self._physics_client_id)
 
         # Run the simulation a bit to let the object stabilize its pose
-        for _ in range(600):
+        for _ in range(100):
             p.stepSimulation(physicsClientId=self._physics_client_id)
 
         obj_pos, obj_orn = p.getBasePositionAndOrientation(self.obj_id, physicsClientId=self._physics_client_id)
@@ -285,21 +264,11 @@ class SqWorldEnv(WorldEnv):
 
     def load_object(self, new_obj):
 
-        # Load object. Randomize its start position if requested
-        if new_obj == self._prev_obj_name and self.obj_id is not None:
-            obj_pos = self._sample_pose()
-            p.resetBasePositionAndOrientation(self.obj_id,
-                                              obj_pos[:3], obj_pos[3:7],
-                                              physicsClientId=self._physics_client_id)
-        else:
-            self._prev_obj_name = new_obj
-            if self.obj_id is not None:
-                p.removeBody(self.obj_id, physicsClientId=self._physics_client_id)
-            self._obj_name = new_obj
-            obj_pos = self._sample_pose()
-            self.obj_id = p.loadURDF(os.path.join(superquadric_objects.getDataPath(), new_obj, "model.urdf"),
-                                     basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
-                                     physicsClientId=self._physics_client_id)
+        self._obj_name = new_obj
+        obj_pos = self._sample_pose()
+        self.obj_id = p.loadURDF(os.path.join(superquadric_objects.getDataPath(), new_obj, "model.urdf"),
+                                 basePosition=obj_pos[:3], baseOrientation=obj_pos[3:7],
+                                 physicsClientId=self._physics_client_id)
 
         # Run the simulation a bit to let the object stabilize its pose
         for _ in range(600):

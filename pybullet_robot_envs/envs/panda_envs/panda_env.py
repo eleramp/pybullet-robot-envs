@@ -44,23 +44,19 @@ class pandaEnv:
         self._num_dof = 7
         self._joint_name_to_ids = {}
         self.robot_id = None
-        self._is_initialized = False
         self._use_simulation = True
 
         self.seed()
         self.reset()
 
     def reset(self):
-        if not self._is_initialized:
-            self._is_initialized = True
-            # Load robot model
-            flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_INERTIA_FROM_FILE
-            self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda_model.urdf"),
-                                       basePosition=self._base_position, useFixedBase=True, flags=flags,
-                                       physicsClientId=self._physics_client_id)
+        # Load robot model
+        flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_SELF_COLLISION | p.URDF_USE_INERTIA_FROM_FILE
+        self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda_model.urdf"),
+                                   basePosition=self._base_position, useFixedBase=True, flags=flags,
+                                   physicsClientId=self._physics_client_id)
 
-            assert self.robot_id is not None, "Failed to load the panda model"
-
+        assert self.robot_id is not None, "Failed to load the panda model"
 
         # reset joints to home position
         num_joints = p.getNumJoints(self.robot_id, physicsClientId=self._physics_client_id)
