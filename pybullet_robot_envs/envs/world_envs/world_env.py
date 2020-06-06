@@ -64,7 +64,6 @@ class WorldEnv:
         self._ws_lim = tuple(workspace_lim)
         self._h_table = []
         self._obj_name = obj_name
-        self._prev_obj_name = None
         self._obj_pose_rnd_std = obj_pose_rnd_std
         self._obj_orientation_rnd = obj_orientation_rnd
         self._obj_init_pose = []
