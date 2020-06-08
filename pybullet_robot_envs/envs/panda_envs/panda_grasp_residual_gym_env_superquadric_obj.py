@@ -398,7 +398,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
                                       sq_exp[0][0], sq_exp[1][0]])
 
             # check dim limits of sq dim params
-            observation_lim.extend([[0.0, 0.3], [0.0, 0.3], [0, 0.3], [-1, 1], [-1, 1]])
+            observation_lim.extend([[0.0, 0.12], [0.0, 0.12], [0, 0.12], [0, 2], [0, 2]])
 
             # --- superq position wrt hand c.o.m. frame --- #
             inv_hand_pos, inv_hand_orn = p.invertTransform(robot_observation[:3], r_quat)
