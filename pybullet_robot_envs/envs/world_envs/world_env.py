@@ -79,7 +79,7 @@ class WorldEnv:
 
     def reset(self):
 
-        p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
+        #p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
 
         # Load table and object
         self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
