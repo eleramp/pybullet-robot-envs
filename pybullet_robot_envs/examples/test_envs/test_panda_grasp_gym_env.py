@@ -17,7 +17,8 @@ import math as m
 
 def main():
 
-    env = PandaGraspResidualGymEnvSqObj(obj_pose_rnd_std=0.0, obj_orn_rnd=1, renders=True, dset='train', n_control_pt=2, control_eu_or_quat=1)
+    env = PandaGraspResidualGymEnvSqObj(obj_pose_rnd_std=0.0, obj_orn_rnd=1, renders=False, dset='train', n_control_pt=2, control_eu_or_quat=1)
+    env.seed(1)
     motorsIds = []
 
     dv = 0.05
@@ -34,7 +35,8 @@ def main():
 
     done = False
     n_episode = 0
-    while n_episode < 100:
+    t0 = time.time()
+    while n_episode < 10:
         # env.render()
         # action = []
         # for motorId in motorsIds:
@@ -45,6 +47,9 @@ def main():
         if done:
             env.reset()
             n_episode += 1
+
+    t1 = time.time()
+    print("elapsed time {}".format(t1-t0))
 
 if __name__ == '__main__':
     main()

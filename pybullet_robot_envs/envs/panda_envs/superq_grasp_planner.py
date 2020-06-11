@@ -57,7 +57,7 @@ class SuperqGraspPlanner:
         self._render = render
 
         # camera
-        self.inHandCam = InHandCamera()
+        self.inHandCam = InHandCamera(self._physics_client_id)
 
         # superquadric lib bindings objects
         self._pointcloud = PointCloud()

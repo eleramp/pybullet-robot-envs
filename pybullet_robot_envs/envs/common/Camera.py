@@ -1,13 +1,38 @@
+import os
 import cv2
 import pybullet as p
 import math
 import numpy as np
 from time import time
+import pkgutil
+
+os.environ['MESA_GL_VERSION_OVERRIDE'] = '3.3'
+os.environ['MESA_GLSL_VERSION_OVERRIDE'] = '330'
 
 
 class Camera:
 
-    def __init__(self):
+    def __init__(self, physics_client_id):
+
+        self._physics_client_id = physics_client_id
+
+        connection_info = p.getConnectionInfo(self._physics_client_id)
+
+        if connection_info['connectionMethod'] is p.DIRECT:
+            # import egl
+            egl = pkgutil.get_loader('eglRenderer')
+
+            if egl:
+                eglPluginId = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
+            else:
+                eglPluginId = p.loadPlugin("eglRendererPlugin")
+
+            if eglPluginId >= 0:
+                print("Using GPU hardware (eglRenderer)")
+            else:
+                print("using CPU renderer (TinyRenderer)")
+
+
         # TODO Load from yaml for different camera configurations
         self.intrinsics = np.array(
             [[596.6278076171875,               0.0, 311.98663330078125, 0.0],
@@ -126,12 +151,21 @@ class Camera:
         """
         view_matrix = self.get_view_matrix(robot_id, client_id)
 
-        _, _, rgb_img, depth_img, seg_img = p.getCameraImage(
-            self.width, self.height,
-            view_matrix, self.projection_matrix,
-            shadow=1, lightDirection=[1, 1, 1],
-            renderer=p.ER_BULLET_HARDWARE_OPENGL,
-            physicsClientId=client_id)
+        connection_info = p.getConnectionInfo(self._physics_client_id)
+
+        if connection_info['connectionMethod'] is p.GUI:
+            _, _, rgb_img, depth_img, seg_img = p.getCameraImage(
+                self.width, self.height,
+                view_matrix, self.projection_matrix,
+                shadow=1, lightDirection=[1, 1, 1],
+                renderer=p.ER_BULLET_HARDWARE_OPENGL,
+                physicsClientId=client_id)
+        else:
+            _, _, rgb_img, depth_img, seg_img = p.getCameraImage(
+                self.width, self.height,
+                view_matrix, self.projection_matrix,
+                shadow=1, lightDirection=[1, 1, 1],
+                physicsClientId=client_id)
 
         rgb_img = np.reshape(rgb_img, (self.height, self.width, 4))
         depth_img = np.reshape(depth_img, (self.height, self.width))
@@ -161,8 +195,8 @@ class Camera:
 
 
 class InHandCamera(Camera):
-    def __init__(self):
-        Camera.__init__(self)
+    def __init__(self, physics_client_id):
+        Camera.__init__(self, physics_client_id)
 
     def getPosRot(self, robot_id, client_id):
         pos, rot, _, _, _, _ = p.getLinkState(robot_id, linkIndex=20,

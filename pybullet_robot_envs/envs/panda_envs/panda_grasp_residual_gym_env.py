@@ -157,7 +157,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
 
         p.resetSimulation(physicsClientId=self._traj_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._traj_client_id)
+        p.setPhysicsEngineParameter(numSolverIterations=5, physicsClientId=self._traj_client_id)
         p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
 
         p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
@@ -188,11 +188,11 @@ class PandaGraspResidualGymEnv(gym.Env):
 
         self._world.reset()
 
-        # Let the world run for a bit
-        for _ in range(200):
-            p.stepSimulation(physicsClientId=self._physics_client_id)
-            if self._renders:
-                time.sleep(self._time_step)
+        # # Let the world run for a bit
+        # for _ in range(200):
+        #     p.stepSimulation(physicsClientId=self._physics_client_id)
+        #     if self._renders:
+        #         time.sleep(self._time_step)
 
         # --- reset base controller --- #
         self._base_controller.reset(obj_id=self._world.obj_id,
