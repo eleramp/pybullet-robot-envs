@@ -62,6 +62,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._noise_pcl = noise_pcl
 
         self._last_frame_time = 0
+        self._n_soft_reset = 0
 
         # self._cum_reward = np.float32(0.0)
 
@@ -150,25 +151,32 @@ class PandaGraspResidualGymEnv(gym.Env):
         return observation_space, action_space
 
     def reset(self):
+        if self._n_soft_reset is 0:
+            self._n_soft_reset = 10
+            hard_reset = 1
 
-        # --- reset simulation --- #
-        p.resetSimulation(physicsClientId=self._physics_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
-        p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
+            # --- reset simulation --- #
+            p.resetSimulation(physicsClientId=self._physics_client_id)
+            p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
+            p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
 
-        p.resetSimulation(physicsClientId=self._traj_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=5, physicsClientId=self._traj_client_id)
-        p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
+            p.resetSimulation(physicsClientId=self._traj_client_id)
+            p.setPhysicsEngineParameter(numSolverIterations=5, physicsClientId=self._traj_client_id)
+            p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
 
-        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
-        p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
+            p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
+            p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
+
+        else:
+            self._n_soft_reset -= 1
+            hard_reset = 0
 
         self._env_step_counter = 0
 
 
         # --- reset robot --- #
-        self._robot.reset()
-        self._robot_traj.reset()
+        self._robot.reset(hard_reset)
+        self._robot_traj.reset(hard_reset)
 
         # # Let the world run for a bit
         # for _ in range(50):
@@ -186,7 +194,7 @@ class PandaGraspResidualGymEnv(gym.Env):
         self._world._obj_name = obj_name
         print("obj_name {}".format(obj_name))
 
-        self._world.reset()
+        self._world.reset(hard_reset)
 
         # # Let the world run for a bit
         # for _ in range(200):

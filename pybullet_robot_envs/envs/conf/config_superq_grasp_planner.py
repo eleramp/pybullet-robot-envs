@@ -8,7 +8,7 @@ robots = [
     ]
 
 objects = {
-        'YcbMustardBottle': 'default',
+        'YcbMustardBottle': 'cylinder',
         'YcbTomatoSoupCan': 'cylinder',
         'YcbCrackerBox': 'box',
         'YcbFoamBrick': 'box',

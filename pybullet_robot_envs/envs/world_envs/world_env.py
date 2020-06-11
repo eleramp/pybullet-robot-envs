@@ -77,22 +77,27 @@ class WorldEnv:
         self.seed()
         self.reset()
 
-    def reset(self):
+    def reset(self, hard_reset=1):
+        if hard_reset == 1:
 
-        #p.loadURDF(os.path.join(pybullet_data.getDataPath(), "plane.urdf"), [0, 0, 0], physicsClientId=self._physics_client_id)
+            # Load table and object
+            self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
+                                  basePosition=[0.85, 0.0, 0.0], useFixedBase=True, physicsClientId=self._physics_client_id)
 
-        # Load table and object
-        self.table_id = p.loadURDF(os.path.join(pybullet_data.getDataPath(), "table/table.urdf"),
-                              basePosition=[0.85, 0.0, 0.0], useFixedBase=True, physicsClientId=self._physics_client_id)
+            table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
+            self._h_table = table_info[5][2] + table_info[3][2]/2
 
-        table_info = p.getCollisionShapeData(self.table_id, -1, physicsClientId=self._physics_client_id)[0]
-        self._h_table = table_info[5][2] + table_info[3][2]/2
+            # set ws limit on z according to table height
+            self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
 
-        # set ws limit on z according to table height
-        self._ws_lim[2][:] = [self._h_table, self._h_table + 0.3]
-
+        else:
+            self.remove_object()
 
         self.load_object(self._obj_name)
+
+    def remove_object(self):
+        # Remove the robot from the simulation
+        p.removeBody(self.obj_id, physicsClientId=self._physics_client_id)
 
     def load_object(self, new_obj):
         # Load object. Randomize its start position if requested

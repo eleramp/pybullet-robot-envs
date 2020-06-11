@@ -49,14 +49,15 @@ class pandaEnv:
         self.seed()
         self.reset()
 
-    def reset(self):
-        # Load robot model
-        flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_INERTIA_FROM_FILE
-        self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda_model.urdf"),
-                                   basePosition=self._base_position, useFixedBase=True, flags=flags,
-                                   physicsClientId=self._physics_client_id)
+    def reset(self, hard_reset=1):
+        if hard_reset == 1:
+            # Load robot model
+            flags = p.URDF_ENABLE_CACHED_GRAPHICS_SHAPES | p.URDF_USE_INERTIA_FROM_FILE
+            self.robot_id = p.loadURDF(os.path.join(franka_panda.get_data_path(), "panda_model.urdf"),
+                                       basePosition=self._base_position, useFixedBase=True, flags=flags,
+                                       physicsClientId=self._physics_client_id)
 
-        assert self.robot_id is not None, "Failed to load the panda model"
+            assert self.robot_id is not None, "Failed to load the panda model"
 
         # reset joints to home position
         num_joints = p.getNumJoints(self.robot_id, physicsClientId=self._physics_client_id)

@@ -58,6 +58,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         self._action_repeat = action_repeat
         self._n_control_pt = n_control_pt + 1
         self._observation = []
+        self._n_soft_reset = 0
 
         self._env_step_counter = 0
         self._renders = renders
@@ -161,23 +162,30 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         return observation_space, action_space
 
     def reset(self):
-        # --- reset simulation --- #
-        p.resetSimulation(physicsClientId=self._physics_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
-        p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
+        if self._n_soft_reset is 0:
+            self._n_soft_reset = 10
+            hard_reset = 1
+            # --- reset simulation --- #
+            p.resetSimulation(physicsClientId=self._physics_client_id)
+            p.setPhysicsEngineParameter(numSolverIterations=150, physicsClientId=self._physics_client_id)
+            p.setTimeStep(self._time_step, physicsClientId=self._physics_client_id)
 
-        p.resetSimulation(physicsClientId=self._traj_client_id)
-        p.setPhysicsEngineParameter(numSolverIterations=5, physicsClientId=self._traj_client_id)
-        p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
+            p.resetSimulation(physicsClientId=self._traj_client_id)
+            p.setPhysicsEngineParameter(numSolverIterations=5, physicsClientId=self._traj_client_id)
+            p.setTimeStep(self._time_step, physicsClientId=self._traj_client_id)
 
-        p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
-        p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
+            p.setGravity(0, 0, -9.8, physicsClientId=self._physics_client_id)
+            p.setGravity(0, 0, -9.8, physicsClientId=self._traj_client_id)
+
+        else:
+            self._n_soft_reset -= 1
+            hard_reset = 0
 
         self._env_step_counter = 0
 
         # --- reset robot --- #
-        self._robot.reset()
-        self._robot_traj.reset()
+        self._robot.reset(hard_reset)
+        self._robot_traj.reset(hard_reset)
 
         # configure gripper in pre-grasp mode
         self._robot.pre_grasp()
@@ -192,7 +200,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         self._world._obj_name = obj_name
         print("it {} - obj_name {}".format(self._obj_iterator, obj_name))
 
-        self._world.reset()
+        self._world.reset(hard_reset)
 
         # # Let the world run for a bit
         # for _ in range(600):
