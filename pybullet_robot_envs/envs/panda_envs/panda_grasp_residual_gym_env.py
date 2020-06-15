@@ -119,6 +119,10 @@ class PandaGraspResidualGymEnv(gym.Env):
         self.seed()
         self.reset()
 
+    def __del__(self):
+        p.disconnect(self._physics_client_id)
+        p.disconnect(self._traj_client_id)
+
     def create_spaces(self):
         # Configure observation limits
         obs, obs_lim = self.get_extended_observation()

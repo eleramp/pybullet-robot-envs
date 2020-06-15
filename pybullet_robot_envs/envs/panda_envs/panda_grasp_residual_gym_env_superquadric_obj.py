@@ -75,6 +75,8 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
 
         self._obj_list = get_dataset_list(dset)
 
+        self._log_id = -1
+
         # self._cum_reward = np.float32(0.0)
 
         # Initialize PyBullet simulator
@@ -130,6 +132,12 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         self.seed()
         self.reset()
 
+    def __del__(self):
+        p.stopStateLogging(self._log_id)
+
+        p.disconnect(self._physics_client_id)
+        p.disconnect(self._traj_client_id)
+
     def create_spaces(self):
         # Configure observation limits
         obs, obs_lim = self.get_extended_observation()
@@ -162,6 +170,9 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         return observation_space, action_space
 
     def reset(self):
+        if self._log_id < 0:
+            self._log_id = p.startStateLogging(p.STATE_LOGGING_PROFILE_TIMINGS, "panda_residual_grasp_superq_objs.json")
+
         if self._n_soft_reset is 0:
             self._n_soft_reset = 10
             hard_reset = 1
