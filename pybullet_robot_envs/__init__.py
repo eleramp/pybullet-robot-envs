@@ -107,8 +107,8 @@ register(
                 'noise_pcl': 0.0,
                 'use_superq': 1,
                 'max_steps': 1000,
-                'n_control_pt': 4,
-                'obj_name': 0,
+                'n_control_pt': 2,
+                'obj_name': None,
                 'renders': False},
 )
 
@@ -116,14 +116,15 @@ register(
         id='PandaGraspResidualGymEnvSqObj-v0',
         entry_point='pybullet_robot_envs.envs:PandaGraspResidualGymEnvSqObj',
         max_episode_steps=1000,
-        kwargs={'control_orientation': 1,
+        kwargs={'dset': 'train',
+                'control_orientation': 1,
+                'control_eu_or_quat': 0,
                 'obj_pose_rnd_std': 0.0,
                 'obj_orn_rnd': 1.0,
-                'noise_pcl': 0.0,
+                'noise_pcl': 0.00,
                 'use_superq': 1,
                 'max_steps': 1000,
-                'n_control_pt': 4,
-                'dset': 'train',
+                'n_control_pt': 2,
                 'renders': False},
 )
 

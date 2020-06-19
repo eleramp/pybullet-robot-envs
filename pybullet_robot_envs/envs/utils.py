@@ -107,6 +107,33 @@ def scale_gym_data(data_space, data):
     return 2.0 * ((data - low) / (high - low)) - 1.0
 
 
+def scale_data(data_low, data_high, data):
+    """
+    Rescale the gym data from [low, high] to [-1, 1]
+    (no need for symmetric data space)
+
+    :param data_space: (gym.spaces.box.Box)
+    :param data: (np.ndarray)
+    :return: (np.ndarray)
+    """
+
+    assert data.shape == data_low.shape == data_high.shape
+
+    res = 2.0 * ((data - data_low) / (data_high - data_low)) - 1.0
+
+    for i, v in enumerate(res):
+        if not np.isfinite(v):
+            res[i] = data[i]
+
+        elif np.isposinf(v):
+            res[i] = data_high[i]
+
+        elif np.isneginf(v):
+            res[i] = data_low[i]
+
+    return res
+
+
 def unscale_gym_data(data_space, scaled_data):
     """
     Rescale the data from [-1, 1] to [low, high]
@@ -120,7 +147,37 @@ def unscale_gym_data(data_space, scaled_data):
     assert scaled_data.shape == data_space.shape
 
     low, high = data_space.low, data_space.high
-    return low + (0.5 * (scaled_data + 1.0) * (high - low))
+
+    res = low + (0.5 * (scaled_data + 1.0) * (high - low))
+
+    return res
+
+
+def unscale_data(data_low, data_high, scaled_data):
+    """
+    Rescale the data from [-1, 1] to [low, high]
+    (no need for symmetric data space)
+
+    :param data_space: (gym.spaces.box.Box)
+    :param scaled_data: (np.ndarray)
+    :return: (np.ndarray)
+    """
+
+    assert scaled_data.shape == data_low.shape == data_high.shape
+
+    res = data_low + (0.5 * (scaled_data + 1.0) * (data_high - data_low))
+
+    for i, v in enumerate(res):
+        if not np.isfinite(v):
+            res[i] = scaled_data[i]
+
+        elif np.isposinf(v):
+            res[i] = data_high[i]
+
+        elif np.isneginf(v):
+            res[i] = data_low[i]
+
+    return res
 
 
 def plot_trajectories_from_file(file_1, file_2):

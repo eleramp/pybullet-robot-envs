@@ -36,7 +36,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
     def __init__(self,
                  log_file=currentdir,
                  dset='train',
-                 action_repeat=60,
+                 action_repeat=100,
                  control_orientation=1,
                  control_eu_or_quat=0,
                  normalize_obs=True,
@@ -133,7 +133,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         self.reset()
 
     def __del__(self):
-        p.stopStateLogging(self._log_id)
+        # p.stopStateLogging(self._log_id)
 
         p.disconnect(self._physics_client_id)
         p.disconnect(self._traj_client_id)
@@ -144,9 +144,13 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
 
         observation_low = []
         observation_high = []
+        # for el in obs_lim:
+        #     observation_low.extend([el[0]])
+        #     observation_high.extend([el[1]])
+
         for el in obs_lim:
-            observation_low.extend([el[0]])
-            observation_high.extend([el[1]])
+            observation_low.extend([-100])
+            observation_high.extend([100])
 
         # Configure the observation space
         observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
@@ -154,27 +158,27 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         # Configure action space
         action_dim = self._robot.get_action_dim()
         if action_dim == 6:  # position and orientation (euler angles)
-            action_high = np.array([0.04, 0.04, 0.04, 0.2, 0.2, 0.5])
-            action_low = np.array([-0.04, -0.04, -0.04, -0.2, -0.2, -0.5])
+            self.action_high = np.array([0.04, 0.04, 0.04, 0.2, 0.2, 0.5])
+            self.action_low = np.array([-0.04, -0.04, -0.04, -0.2, -0.2, -0.5])
 
         elif action_dim == 7:  # position and orientation (quaternion)
-            action_high = np.array([0.04, 0.04, 0.04, 1, 1, 1, 1])
-            action_low = np.array([-0.04, -0.04, -0.04, -1, -1, -1, -1])
+            self.action_high = np.array([0.04, 0.04, 0.04, 1, 1, 1, 1])
+            self.action_low = np.array([-0.04, -0.04, -0.04, -1, -1, -1, -1])
 
         else:  # only position
-            action_high = np.array([0.04, 0.04, 0.04])
-            action_low = np.array([-0.04, -0.04, -0.04])
+            self.action_high = np.array([0.04, 0.04, 0.04])
+            self.action_low = np.array([-0.04, -0.04, -0.04])
 
-        action_space = spaces.Box(action_low, action_high, dtype='float32')
+        action_space = spaces.Box(np.array([-1] * len(self.action_low)), np.array([1] * len(self.action_low)), dtype='float32')
 
         return observation_space, action_space
 
     def reset(self):
-        if self._log_id < 0:
-            self._log_id = p.startStateLogging(p.STATE_LOGGING_PROFILE_TIMINGS, "panda_residual_grasp_superq_objs.json")
+        # if self._log_id < 0:
+        #     self._log_id = p.startStateLogging(p.STATE_LOGGING_PROFILE_TIMINGS, "panda_residual_grasp_superq_objs.json")
 
         if self._n_soft_reset is 0:
-            self._n_soft_reset = 10
+            self._n_soft_reset = 0
             hard_reset = 1
             # --- reset simulation --- #
             p.resetSimulation(physicsClientId=self._physics_client_id)
@@ -462,7 +466,17 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
                 self._observation.extend(list(obj_orn_in_hand))
                 observation_lim.extend(robot_obs_lim[3:7])
 
-        return np.array(self._observation), observation_lim
+        # normalize observation
+        observation_low = []
+        observation_high = []
+
+        for el in observation_lim:
+            observation_low.extend([el[0]])
+            observation_high.extend([el[1]])
+
+        scaled_obs = scale_data(np.array(observation_low), np.array(observation_high), np.array(self._observation))
+
+        return scaled_obs, observation_lim
 
     def apply_action(self, action):
         # process action and send it to the robot
@@ -577,8 +591,11 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
 
         # self._cum_reward = np.float32(0.0)
 
+        # unscale action from [-1, 1] to action limits
+        scaled_action = unscale_data(self.action_low, self.action_high, action)
+
         # apply action on the robot
-        applied_action = self.apply_action(action)
+        applied_action = self.apply_action(scaled_action)
 
         w_obs, _ = self._world.get_observation()
         r_obs, _ = self._robot.get_observation()
@@ -588,7 +605,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         }
 
         done = self._termination(w_obs)
-        reward = self._compute_reward(w_obs, r_obs, action)
+        reward = self._compute_reward(w_obs, r_obs, scaled_action)
 
         obs, _ = self.get_extended_observation()
 
@@ -599,7 +616,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         # print("reward")
         # print(self._cum_reward)
 
-        return scaled_obs, np.array(reward), np.array(done), info
+        return scaled_obs, reward, done, info
 
     def seed(self, seed=None):
         # seed everything for reproducibility

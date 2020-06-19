@@ -18,19 +18,19 @@ class Camera:
 
         connection_info = p.getConnectionInfo(self._physics_client_id)
 
-        if connection_info['connectionMethod'] is p.DIRECT:
+        #if connection_info['connectionMethod'] is p.DIRECT:
             # import egl
-            egl = pkgutil.get_loader('eglRenderer')
+        #    egl = pkgutil.get_loader('eglRenderer')
 
-            if egl:
-                eglPluginId = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
-            else:
-                eglPluginId = p.loadPlugin("eglRendererPlugin")
+        #    if egl:
+        #        eglPluginId = p.loadPlugin(egl.get_filename(), "_eglRendererPlugin")
+        #    else:
+        #        eglPluginId = p.loadPlugin("eglRendererPlugin")
 
-            if eglPluginId >= 0:
-                print("Using GPU hardware (eglRenderer)")
-            else:
-                print("using CPU renderer (TinyRenderer)")
+        #    if eglPluginId >= 0:
+        #        print("Using GPU hardware (eglRenderer)")
+        #    else:
+        #        print("using CPU renderer (TinyRenderer)")
 
 
         # TODO Load from yaml for different camera configurations

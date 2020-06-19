@@ -105,6 +105,9 @@ class pandaEnv:
             jointInfo = p.getJointInfo(self.robot_id, self._joint_name_to_ids[joint_name], physicsClientId=self._physics_client_id)
 
             ll, ul = jointInfo[8:10]
+            # # ceil to second digit
+            # ll = m.ceil(ll * 100) / 100
+            # ul = m.ceil(ul * 100) / 100
             jr = ul - ll
             # For simplicity, assume resting state == initial state
             rp = self.initial_positions[joint_name]
@@ -179,10 +182,10 @@ class pandaEnv:
             vel_mean = [0.0, 0.01, 0.0]
 
             vel_l = np.subtract(state[6], vel_mean)
-            vel_l = np.divide(vel_l, vel_std)
+            # vel_l = np.divide(vel_l, vel_std)
 
             observation.extend(list(vel_l))
-            observation_lim.extend([[-1, 1], [-1, 1], [-1, 1]])
+            observation_lim.extend([[-np.inf, np.inf], [-np.inf, np.inf], [-np.inf, np.inf]])
 
         # ------------------- #
         # --- Joint poses --- #
@@ -193,6 +196,7 @@ class pandaEnv:
 
         observation.extend(list(jointPoses))
         observation_lim.extend([[self.ll[i], self.ul[i]] for i in range(0, len(self._joint_name_to_ids.values()))])
+        # observation_lim.extend([[-np.inf, np.inf] for i in range(0, len(self._joint_name_to_ids.values()))])
 
         return observation, observation_lim
 
