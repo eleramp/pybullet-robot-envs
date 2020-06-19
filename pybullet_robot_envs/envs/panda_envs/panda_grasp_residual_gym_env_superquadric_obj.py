@@ -39,7 +39,7 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
                  action_repeat=100,
                  control_orientation=1,
                  control_eu_or_quat=0,
-                 normalize_obs=True,
+                 normalize_obs=False,
                  obj_pose_rnd_std=0.0,
                  obj_orn_rnd=0.0,
                  noise_pcl=0.00,
@@ -149,8 +149,8 @@ class PandaGraspResidualGymEnvSqObj(gym.Env):
         #     observation_high.extend([el[1]])
 
         for el in obs_lim:
-            observation_low.extend([-100])
-            observation_high.extend([100])
+            observation_low.extend([-np.inf])
+            observation_high.extend([np.inf])
 
         # Configure the observation space
         observation_space = spaces.Box(np.array(observation_low), np.array(observation_high), dtype='float32')
